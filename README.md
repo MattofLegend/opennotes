@@ -7,6 +7,8 @@
 [license-badge]: https://img.shields.io/badge/License-MIT-yellow.svg
 [license-url]: https://opensource.org/licenses/MIT
 
+> **Note:** This project is a fork of [openwork](https://github.com/langchain-ai/openwork).
+
 A desktop interface for [deepagentsjs](https://github.com/langchain-ai/deepagentsjs) — an opinionated harness for building deep agents with filesystem capabilities planning, and subagent delegation.
 
 ![opennotes screenshot](docs/screenshot.png)

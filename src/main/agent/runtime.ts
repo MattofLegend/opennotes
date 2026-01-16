@@ -151,8 +151,8 @@ The workspace root is: ${workspacePath}`
     systemPrompt,
     // Custom filesystem prompt for absolute paths (requires deepagents update)
     filesystemSystemPrompt,
-    // Require human approval for all shell commands
-    interruptOn: { execute: true }
+    // Require human approval for shell commands and file writes
+    interruptOn: { execute: true, write_file: true, edit_file: true }
   } as Parameters<typeof createDeepAgent>[0])
 
   console.log('[Runtime] Deep agent created with LocalSandbox at:', workspacePath)

@@ -69,11 +69,19 @@ function FileTab({ file, isActive, onSelect, onClose }: FileTabProps) {
   }
 
   return (
-    <button
+    <div
+      role="tab"
+      tabIndex={0}
       onClick={onSelect}
       onMouseDown={handleMouseDown}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
       className={cn(
-        "group flex items-center gap-2 px-3 h-full text-sm transition-colors shrink-0 border-r border-border max-w-[200px]",
+        "group flex items-center gap-2 px-3 h-full text-sm transition-colors shrink-0 border-r border-border max-w-[200px] cursor-pointer",
         isActive
           ? "bg-background text-foreground border-b-2 border-b-primary"
           : "text-muted-foreground hover:text-foreground hover:bg-background-interactive"
@@ -91,7 +99,7 @@ function FileTab({ file, isActive, onSelect, onClose }: FileTabProps) {
       >
         <X className="size-3" />
       </button>
-    </button>
+    </div>
   )
 }
 

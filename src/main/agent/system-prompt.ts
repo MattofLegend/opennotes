@@ -92,6 +92,7 @@ The execute tool runs commands directly on the user's machine. Use it for:
 
 **Important:**
 - All execute commands require user approval before running
+- All file write/edit operations (write_file, edit_file) require user approval before running
 - Commands run in the workspace root directory
 - Avoid using shell for file reading (use read_file instead)
 - Avoid using shell for file searching (use grep/glob instead)

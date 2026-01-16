@@ -1,3 +1,4 @@
+import { FileCode } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { TabBar } from './TabBar'
 import { FileViewer } from './FileViewer'
@@ -9,11 +10,15 @@ interface TabbedPanelProps {
 }
 
 export function TabbedPanel({ threadId, showTabBar = true }: TabbedPanelProps) {
-  const { activeTab, openFiles } = useAppStore()
+  const { activeTab, openFiles, rightPanelMode } = useAppStore()
 
-  // Determine what to render based on active tab
   const isAgentTab = activeTab === 'agent'
   const activeFile = openFiles.find((f) => f.path === activeTab)
+  const chatInRightPanel = rightPanelMode === 'chat'
+
+  const showChat = isAgentTab && !chatInRightPanel
+  const showFile = activeFile !== undefined
+  const showEmptyState = !showChat && !showFile
 
   return (
     <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
@@ -25,17 +30,22 @@ export function TabbedPanel({ threadId, showTabBar = true }: TabbedPanelProps) {
 
       {/* Content Area */}
       <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-        {isAgentTab ? (
+        {showChat ? (
           <ChatContainer threadId={threadId} />
-        ) : activeFile ? (
+        ) : showFile ? (
           // Use key to force remount when file changes, ensuring fresh state
           <FileViewer key={activeFile.path} filePath={activeFile.path} />
-        ) : (
-          // Fallback - shouldn't happen but just in case
-          <div className="flex flex-1 items-center justify-center text-muted-foreground">
-            Select a tab to view content
+        ) : showEmptyState ? (
+          <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground gap-3">
+            <FileCode className="size-12 opacity-30" />
+            <div className="text-center">
+              <div className="text-sm font-medium">File Viewer</div>
+              <div className="text-xs mt-1 opacity-75">
+                Click a file in the sidebar to view it here
+              </div>
+            </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )

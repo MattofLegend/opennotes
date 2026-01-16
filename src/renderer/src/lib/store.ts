@@ -57,6 +57,7 @@ interface AppState {
 
   // Right panel state
   rightPanelTab: 'todos' | 'files' | 'subagents'
+  rightPanelMode: 'chat' | 'inspector'
 
   // Settings dialog state
   settingsOpen: boolean
@@ -117,6 +118,7 @@ interface AppState {
 
   // Panel actions
   setRightPanelTab: (tab: 'todos' | 'files' | 'subagents') => void
+  setRightPanelMode: (mode: 'chat' | 'inspector') => void
 
   // Settings actions
   setSettingsOpen: (open: boolean) => void
@@ -148,6 +150,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   providers: [],
   currentModel: 'claude-sonnet-4-5-20250929',
   rightPanelTab: 'todos',
+  rightPanelMode: 'chat',
   settingsOpen: false,
   sidebarCollapsed: false,
   openFiles: [],
@@ -535,6 +538,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Panel actions
   setRightPanelTab: (tab: 'todos' | 'files' | 'subagents') => {
     set({ rightPanelTab: tab })
+  },
+
+  setRightPanelMode: (mode: 'chat' | 'inspector') => {
+    set({ rightPanelMode: mode })
   },
 
   // Settings actions

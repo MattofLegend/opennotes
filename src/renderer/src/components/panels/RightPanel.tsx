@@ -21,12 +21,15 @@ import {
   FileCode,
   FileJson,
   Image,
-  FileType
+  FileType,
+  MessageSquare,
+  Search
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ChatContainer } from '@/components/chat/ChatContainer'
 import type { Todo } from '@/types'
 
 const HEADER_HEIGHT = 40 // px
@@ -114,8 +117,41 @@ function ResizeHandle({ onDrag }: ResizeHandleProps): React.JSX.Element {
   )
 }
 
+function ModeTabBar(): React.JSX.Element {
+  const { rightPanelMode, setRightPanelMode } = useAppStore()
+
+  return (
+    <div className="flex h-9 border-b border-border bg-sidebar shrink-0">
+      <button
+        onClick={() => setRightPanelMode('chat')}
+        className={cn(
+          'flex-1 flex items-center justify-center gap-2 text-xs font-medium transition-colors',
+          rightPanelMode === 'chat'
+            ? 'bg-background text-foreground border-b-2 border-b-primary'
+            : 'text-muted-foreground hover:text-foreground hover:bg-background-interactive'
+        )}
+      >
+        <MessageSquare className="size-3.5" />
+        <span>Chat</span>
+      </button>
+      <button
+        onClick={() => setRightPanelMode('inspector')}
+        className={cn(
+          'flex-1 flex items-center justify-center gap-2 text-xs font-medium transition-colors',
+          rightPanelMode === 'inspector'
+            ? 'bg-background text-foreground border-b-2 border-b-primary'
+            : 'text-muted-foreground hover:text-foreground hover:bg-background-interactive'
+        )}
+      >
+        <Search className="size-3.5" />
+        <span>Inspector</span>
+      </button>
+    </div>
+  )
+}
+
 export function RightPanel(): React.JSX.Element {
-  const { todos, workspaceFiles, subagents } = useAppStore()
+  const { todos, workspaceFiles, subagents, rightPanelMode, currentThreadId } = useAppStore()
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [tasksOpen, setTasksOpen] = useState(true)
@@ -308,59 +344,75 @@ export function RightPanel(): React.JSX.Element {
       ref={containerRef}
       className="flex h-full w-full flex-col border-l border-border bg-sidebar overflow-hidden"
     >
-      {/* TASKS */}
-      <div className="flex flex-col shrink-0 border-b border-border">
-        <SectionHeader
-          title="TASKS"
-          icon={ListTodo}
-          badge={todos.length}
-          isOpen={tasksOpen}
-          onToggle={() => setTasksOpen((prev) => !prev)}
-        />
-        {tasksOpen && (
-          <div className="overflow-auto" style={{ height: heights.tasks }}>
-            <TasksContent />
+      <ModeTabBar />
+
+      {rightPanelMode === 'chat' ? (
+        <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+          {currentThreadId ? (
+            <ChatContainer threadId={currentThreadId} />
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
+              Select a thread to start chatting
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* TASKS */}
+          <div className="flex flex-col shrink-0 border-b border-border">
+            <SectionHeader
+              title="TASKS"
+              icon={ListTodo}
+              badge={todos.length}
+              isOpen={tasksOpen}
+              onToggle={() => setTasksOpen((prev) => !prev)}
+            />
+            {tasksOpen && (
+              <div className="overflow-auto" style={{ height: heights.tasks }}>
+                <TasksContent />
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Resize handle after TASKS */}
-      {tasksOpen && (filesOpen || agentsOpen) && <ResizeHandle onDrag={handleTasksResize} />}
+          {/* Resize handle after TASKS */}
+          {tasksOpen && (filesOpen || agentsOpen) && <ResizeHandle onDrag={handleTasksResize} />}
 
-      {/* FILES */}
-      <div className="flex flex-col shrink-0 border-b border-border">
-        <SectionHeader
-          title="FILES"
-          icon={FolderTree}
-          badge={workspaceFiles.length}
-          isOpen={filesOpen}
-          onToggle={() => setFilesOpen((prev) => !prev)}
-        />
-        {filesOpen && (
-          <div className="overflow-auto" style={{ height: heights.files }}>
-            <FilesContent />
+          {/* FILES */}
+          <div className="flex flex-col shrink-0 border-b border-border">
+            <SectionHeader
+              title="FILES"
+              icon={FolderTree}
+              badge={workspaceFiles.length}
+              isOpen={filesOpen}
+              onToggle={() => setFilesOpen((prev) => !prev)}
+            />
+            {filesOpen && (
+              <div className="overflow-auto" style={{ height: heights.files }}>
+                <FilesContent />
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Resize handle after FILES */}
-      {filesOpen && agentsOpen && <ResizeHandle onDrag={handleFilesResize} />}
+          {/* Resize handle after FILES */}
+          {filesOpen && agentsOpen && <ResizeHandle onDrag={handleFilesResize} />}
 
-      {/* AGENTS */}
-      <div className="flex flex-col shrink-0">
-        <SectionHeader
-          title="AGENTS"
-          icon={GitBranch}
-          badge={subagents.length}
-          isOpen={agentsOpen}
-          onToggle={() => setAgentsOpen((prev) => !prev)}
-        />
-        {agentsOpen && (
-          <div className="overflow-auto" style={{ height: heights.agents }}>
-            <AgentsContent />
+          {/* AGENTS */}
+          <div className="flex flex-col shrink-0">
+            <SectionHeader
+              title="AGENTS"
+              icon={GitBranch}
+              badge={subagents.length}
+              isOpen={agentsOpen}
+              onToggle={() => setAgentsOpen((prev) => !prev)}
+            />
+            {agentsOpen && (
+              <div className="overflow-auto" style={{ height: heights.agents }}>
+                <AgentsContent />
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </aside>
   )
 }

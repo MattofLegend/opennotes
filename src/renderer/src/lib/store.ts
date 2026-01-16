@@ -357,10 +357,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       workspaceFiles: [],
       // Keep workspacePath - it may have been pre-set (e.g., from project selection)
       subagents: [],
-      // Reset tabs for new thread
-      openFiles: [],
-      activeTab: 'agent',
-      fileContents: {},
+      // DON'T reset openFiles, activeTab, fileContents - notes persist across threads
       tabStateByThread: newTabStateByThread
     }))
     return thread
@@ -545,12 +542,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       messages: [],
       todos: [],
       workspaceFiles: [],
-      subagents: [],
+      subagents: []
       // Keep workspace path so user doesn't have to re-select
-      // Reset tabs for new chat
-      openFiles: [],
-      activeTab: 'agent',
-      fileContents: {}
+      // DON'T reset openFiles, activeTab, fileContents - notes persist across threads
     })
   },
 

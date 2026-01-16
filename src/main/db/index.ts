@@ -70,6 +70,18 @@ export async function initializeDatabase(): Promise<SqlJsDatabase> {
   }
 
   // Create tables if they don't exist
+  
+  // Projects table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS projects (
+      project_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      notes_folder TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `)
+
   db.run(`
     CREATE TABLE IF NOT EXISTS threads (
       thread_id TEXT PRIMARY KEY,
@@ -78,9 +90,17 @@ export async function initializeDatabase(): Promise<SqlJsDatabase> {
       metadata TEXT,
       status TEXT DEFAULT 'idle',
       thread_values TEXT,
-      title TEXT
+      title TEXT,
+      project_id TEXT REFERENCES projects(project_id) ON DELETE SET NULL
     )
   `)
+  
+  // Migration: Add project_id column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE threads ADD COLUMN project_id TEXT REFERENCES projects(project_id) ON DELETE SET NULL`)
+  } catch {
+    // Column already exists, ignore
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS runs (
@@ -135,6 +155,14 @@ export function closeDatabase(): void {
 
 // Helper functions for common operations
 
+export interface Project {
+  project_id: string
+  name: string
+  notes_folder: string
+  created_at: number
+  updated_at: number
+}
+
 export interface Thread {
   thread_id: string
   created_at: number
@@ -143,6 +171,7 @@ export interface Thread {
   status: string
   thread_values: string | null
   title: string | null
+  project_id: string | null
 }
 
 export function getAllThreads(): Thread[] {
@@ -173,14 +202,18 @@ export function getThread(threadId: string): Thread | null {
   return thread
 }
 
-export function createThread(threadId: string, metadata?: Record<string, unknown>): Thread {
+export function createThread(
+  threadId: string,
+  metadata?: Record<string, unknown>,
+  projectId?: string | null
+): Thread {
   const database = getDb()
   const now = Date.now()
 
   database.run(
-    `INSERT INTO threads (thread_id, created_at, updated_at, metadata, status)
-     VALUES (?, ?, ?, ?, ?)`,
-    [threadId, now, now, metadata ? JSON.stringify(metadata) : null, 'idle']
+    `INSERT INTO threads (thread_id, created_at, updated_at, metadata, status, project_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [threadId, now, now, metadata ? JSON.stringify(metadata) : null, 'idle', projectId ?? null]
   )
 
   saveToDisk()
@@ -192,13 +225,14 @@ export function createThread(threadId: string, metadata?: Record<string, unknown
     metadata: metadata ? JSON.stringify(metadata) : null,
     status: 'idle',
     thread_values: null,
-    title: null
+    title: null,
+    project_id: projectId ?? null
   }
 }
 
 export function updateThread(
   threadId: string,
-  updates: Partial<Omit<Thread, 'thread_id' | 'created_at'>>
+  updates: Partial<Omit<Thread, 'thread_id' | 'created_at'>> & { project_id?: string | null }
 ): Thread | null {
   const database = getDb()
   const existing = getThread(threadId)
@@ -227,6 +261,10 @@ export function updateThread(
     setClauses.push('title = ?')
     values.push(updates.title)
   }
+  if ('project_id' in updates) {
+    setClauses.push('project_id = ?')
+    values.push(updates.project_id ?? null)
+  }
 
   values.push(threadId)
 
@@ -241,4 +279,112 @@ export function deleteThread(threadId: string): void {
   const database = getDb()
   database.run('DELETE FROM threads WHERE thread_id = ?', [threadId])
   saveToDisk()
+}
+
+// Project operations
+
+export function getAllProjects(): Project[] {
+  const database = getDb()
+  const stmt = database.prepare('SELECT * FROM projects ORDER BY updated_at DESC')
+  const projects: Project[] = []
+
+  while (stmt.step()) {
+    projects.push(stmt.getAsObject() as unknown as Project)
+  }
+  stmt.free()
+
+  return projects
+}
+
+export function getProject(projectId: string): Project | null {
+  const database = getDb()
+  const stmt = database.prepare('SELECT * FROM projects WHERE project_id = ?')
+  stmt.bind([projectId])
+
+  if (!stmt.step()) {
+    stmt.free()
+    return null
+  }
+
+  const project = stmt.getAsObject() as unknown as Project
+  stmt.free()
+  return project
+}
+
+export function createProject(projectId: string, name: string, notesFolder: string): Project {
+  const database = getDb()
+  const now = Date.now()
+
+  database.run(
+    `INSERT INTO projects (project_id, name, notes_folder, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [projectId, name, notesFolder, now, now]
+  )
+
+  saveToDisk()
+
+  return {
+    project_id: projectId,
+    name,
+    notes_folder: notesFolder,
+    created_at: now,
+    updated_at: now
+  }
+}
+
+export function updateProject(
+  projectId: string,
+  updates: Partial<Omit<Project, 'project_id' | 'created_at'>>
+): Project | null {
+  const database = getDb()
+  const existing = getProject(projectId)
+
+  if (!existing) return null
+
+  const now = Date.now()
+  const setClauses: string[] = ['updated_at = ?']
+  const values: (string | number | null)[] = [now]
+
+  if (updates.name !== undefined) {
+    setClauses.push('name = ?')
+    values.push(updates.name)
+  }
+  if (updates.notes_folder !== undefined) {
+    setClauses.push('notes_folder = ?')
+    values.push(updates.notes_folder)
+  }
+
+  values.push(projectId)
+
+  database.run(`UPDATE projects SET ${setClauses.join(', ')} WHERE project_id = ?`, values)
+
+  saveToDisk()
+
+  return getProject(projectId)
+}
+
+export function deleteProject(projectId: string): void {
+  const database = getDb()
+  database.run('DELETE FROM projects WHERE project_id = ?', [projectId])
+  saveToDisk()
+}
+
+export function getThreadsByProject(projectId: string | null): Thread[] {
+  const database = getDb()
+  let stmt
+  
+  if (projectId === null) {
+    stmt = database.prepare('SELECT * FROM threads WHERE project_id IS NULL ORDER BY updated_at DESC')
+  } else {
+    stmt = database.prepare('SELECT * FROM threads WHERE project_id = ? ORDER BY updated_at DESC')
+    stmt.bind([projectId])
+  }
+  
+  const threads: Thread[] = []
+  while (stmt.step()) {
+    threads.push(stmt.getAsObject() as unknown as Thread)
+  }
+  stmt.free()
+
+  return threads
 }

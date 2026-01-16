@@ -103,16 +103,19 @@ const api = {
     }
   },
   threads: {
-    list: (): Promise<Thread[]> => {
-      return ipcRenderer.invoke('threads:list')
+    list: (projectId?: string | null): Promise<Thread[]> => {
+      return ipcRenderer.invoke('threads:list', projectId)
     },
     get: (threadId: string): Promise<Thread | null> => {
       return ipcRenderer.invoke('threads:get', threadId)
     },
-    create: (metadata?: Record<string, unknown>): Promise<Thread> => {
-      return ipcRenderer.invoke('threads:create', metadata)
+    create: (options?: { metadata?: Record<string, unknown>; projectId?: string | null }): Promise<Thread> => {
+      return ipcRenderer.invoke('threads:create', options)
     },
-    update: (threadId: string, updates: Partial<Thread>): Promise<Thread> => {
+    update: (
+      threadId: string,
+      updates: Partial<Thread> & { project_id?: string | null }
+    ): Promise<Thread> => {
       return ipcRenderer.invoke('threads:update', { threadId, updates })
     },
     delete: (threadId: string): Promise<void> => {
@@ -123,6 +126,50 @@ const api = {
     },
     generateTitle: (message: string): Promise<string> => {
       return ipcRenderer.invoke('threads:generateTitle', message)
+    }
+  },
+  projects: {
+    list: (): Promise<Array<{
+      id: string
+      name: string
+      notesFolder: string
+      createdAt: Date
+      updatedAt: Date
+    }>> => {
+      return ipcRenderer.invoke('projects:list')
+    },
+    get: (projectId: string): Promise<{
+      id: string
+      name: string
+      notesFolder: string
+      createdAt: Date
+      updatedAt: Date
+    } | null> => {
+      return ipcRenderer.invoke('projects:get', projectId)
+    },
+    create: (params: { name: string }): Promise<{
+      id: string
+      name: string
+      notesFolder: string
+      createdAt: Date
+      updatedAt: Date
+    }> => {
+      return ipcRenderer.invoke('projects:create', params)
+    },
+    update: (
+      projectId: string,
+      updates: { name?: string; notesFolder?: string }
+    ): Promise<{
+      id: string
+      name: string
+      notesFolder: string
+      createdAt: Date
+      updatedAt: Date
+    }> => {
+      return ipcRenderer.invoke('projects:update', { projectId, updates })
+    },
+    delete: (projectId: string): Promise<void> => {
+      return ipcRenderer.invoke('projects:delete', projectId)
     }
   },
   models: {

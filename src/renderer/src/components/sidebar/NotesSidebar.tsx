@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react'
 import {
   Plus,
-  MessageSquare,
+  FolderKanban,
   Trash2,
   Pencil,
-  Loader2,
   FileText,
   Clock,
   Star,
   Trash,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Layers
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAppStore } from '@/lib/store'
-import { cn, formatRelativeTime, truncate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -37,13 +37,13 @@ const SMART_VIEWS: { id: SmartViewType; label: string; icon: React.ElementType }
 
 export function NotesSidebar(): React.JSX.Element {
   const {
-    threads,
-    currentThreadId,
-    loadingThreadId,
-    createThread,
-    selectThread,
-    deleteThread,
-    updateThread,
+    projects,
+    currentProjectId,
+    loadProjects,
+    createProject,
+    selectProject,
+    deleteProject,
+    updateProject,
     notesFilter,
     setNotesFilter,
     loadNotes,
@@ -52,11 +52,14 @@ export function NotesSidebar(): React.JSX.Element {
     createFolder
   } = useAppStore()
 
-  const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
-  const [editingTitle, setEditingTitle] = useState('')
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [isSubmittingProject, setIsSubmittingProject] = useState(false)
 
   // Section collapse states
-  const [threadsOpen, setThreadsOpen] = useState(true)
+  const [projectsOpen, setProjectsOpen] = useState(true)
   const [foldersOpen, setFoldersOpen] = useState(true)
   const [tagsOpen, setTagsOpen] = useState(true)
 
@@ -64,33 +67,58 @@ export function NotesSidebar(): React.JSX.Element {
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
 
-  // Load notes data on mount
+  // Load data on mount
   useEffect(() => {
+    loadProjects()
     loadNotes()
     loadFolders()
     loadTags()
-  }, [loadNotes, loadFolders, loadTags])
+  }, [loadProjects, loadNotes, loadFolders, loadTags])
 
-  const startEditing = (threadId: string, currentTitle: string): void => {
-    setEditingThreadId(threadId)
-    setEditingTitle(currentTitle || '')
+  const startEditingProject = (projectId: string, currentName: string): void => {
+    setEditingProjectId(projectId)
+    setEditingName(currentName || '')
   }
 
-  const saveTitle = async (): Promise<void> => {
-    if (editingThreadId && editingTitle.trim()) {
-      await updateThread(editingThreadId, { title: editingTitle.trim() })
+  const saveProjectName = async (): Promise<void> => {
+    if (editingProjectId && editingName.trim()) {
+      await updateProject(editingProjectId, { name: editingName.trim() })
     }
-    setEditingThreadId(null)
-    setEditingTitle('')
+    setEditingProjectId(null)
+    setEditingName('')
   }
 
-  const cancelEditing = (): void => {
-    setEditingThreadId(null)
-    setEditingTitle('')
+  const cancelEditingProject = (): void => {
+    setEditingProjectId(null)
+    setEditingName('')
   }
 
-  const handleNewThread = async (): Promise<void> => {
-    await createThread({ title: `Thread ${new Date().toLocaleDateString()}` })
+  const handleNewProject = (): void => {
+    setIsCreatingProject(true)
+    setNewProjectName('')
+    setProjectsOpen(true)
+  }
+
+  const handleSubmitProject = async (): Promise<void> => {
+    if (isSubmittingProject) return
+    setIsSubmittingProject(true)
+    
+    try {
+      if (newProjectName.trim()) {
+        await createProject(newProjectName.trim())
+      }
+    } catch (error) {
+      console.error('Failed to create project:', error)
+    } finally {
+      setIsCreatingProject(false)
+      setNewProjectName('')
+      setIsSubmittingProject(false)
+    }
+  }
+
+  const handleCancelProject = (): void => {
+    setIsCreatingProject(false)
+    setNewProjectName('')
   }
 
   const handleSmartViewClick = (viewId: SmartViewType): void => {
@@ -105,7 +133,10 @@ export function NotesSidebar(): React.JSX.Element {
 
   const handleSubmitFolder = async (): Promise<void> => {
     if (newFolderName.trim()) {
-      await createFolder(undefined, newFolderName.trim())
+      // If in a project, create folder inside the project's folder
+      const currentProject = currentProjectId ? projects.find((p) => p.id === currentProjectId) : null
+      const parentFolder = currentProject?.notesFolder || undefined
+      await createFolder(parentFolder, newFolderName.trim())
     }
     setIsCreatingFolder(false)
     setNewFolderName('')
@@ -146,60 +177,51 @@ export function NotesSidebar(): React.JSX.Element {
             })}
           </div>
 
-          {/* Chats Section */}
+          {/* Projects Section */}
           <WideHeader
-            title="Chats"
-            isOpen={threadsOpen}
-            onToggle={() => setThreadsOpen(!threadsOpen)}
-            onAdd={handleNewThread}
+            title="All Projects"
+            isOpen={projectsOpen}
+            onToggle={() => setProjectsOpen(!projectsOpen)}
+            onTitleClick={() => selectProject(null)}
+            onAdd={handleNewProject}
+            isSelected={currentProjectId === null}
           />
-          {threadsOpen && (
+          {projectsOpen && (
             <div className="py-1">
-              {threads.map((thread) => (
-                <ContextMenu key={thread.thread_id}>
+              {projects.map((project) => (
+                <ContextMenu key={project.id}>
                   <ContextMenuTrigger asChild>
                     <div
                       className={cn(
                         'group flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors overflow-hidden',
-                        currentThreadId === thread.thread_id
+                        currentProjectId === project.id
                           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                           : 'hover:bg-sidebar-accent/50'
                       )}
                       onClick={() => {
-                        if (editingThreadId !== thread.thread_id) {
-                          selectThread(thread.thread_id)
+                        if (editingProjectId !== project.id) {
+                          selectProject(project.id)
                         }
                       }}
                     >
-                      {loadingThreadId === thread.thread_id ? (
-                        <Loader2 className="size-4 shrink-0 text-status-info animate-spin" />
-                      ) : (
-                        <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
-                      )}
+                      <FolderKanban className="size-4 shrink-0 text-muted-foreground" />
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        {editingThreadId === thread.thread_id ? (
+                        {editingProjectId === project.id ? (
                           <input
                             type="text"
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onBlur={saveTitle}
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onBlur={saveProjectName}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveTitle()
-                              if (e.key === 'Escape') cancelEditing()
+                              if (e.key === 'Enter') saveProjectName()
+                              if (e.key === 'Escape') cancelEditingProject()
                             }}
                             className="w-full bg-background border border-border rounded px-1 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
                           />
                         ) : (
-                          <>
-                            <div className="text-sm truncate block">
-                              {thread.title || truncate(thread.thread_id, 20)}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground truncate">
-                              {formatRelativeTime(thread.updated_at)}
-                            </div>
-                          </>
+                          <div className="text-sm truncate block">{project.name}</div>
                         )}
                       </div>
                       <Button
@@ -208,7 +230,7 @@ export function NotesSidebar(): React.JSX.Element {
                         className="opacity-0 group-hover:opacity-100 shrink-0"
                         onClick={(e) => {
                           e.stopPropagation()
-                          deleteThread(thread.thread_id)
+                          deleteProject(project.id)
                         }}
                       >
                         <Trash2 className="size-3" />
@@ -216,17 +238,12 @@ export function NotesSidebar(): React.JSX.Element {
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem
-                      onClick={() => startEditing(thread.thread_id, thread.title || '')}
-                    >
+                    <ContextMenuItem onClick={() => startEditingProject(project.id, project.name)}>
                       <Pencil className="size-4 mr-2" />
                       Rename
                     </ContextMenuItem>
                     <ContextMenuSeparator />
-                    <ContextMenuItem
-                      variant="destructive"
-                      onClick={() => deleteThread(thread.thread_id)}
-                    >
+                    <ContextMenuItem variant="destructive" onClick={() => deleteProject(project.id)}>
                       <Trash2 className="size-4 mr-2" />
                       Delete
                     </ContextMenuItem>
@@ -234,23 +251,52 @@ export function NotesSidebar(): React.JSX.Element {
                 </ContextMenu>
               ))}
 
-              {threads.length === 0 && (
+              {/* New project input */}
+              {isCreatingProject && (
+                <div className="flex items-center gap-2 px-3 py-1">
+                  <FolderKanban className="size-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSubmitProject()
+                      }
+                      if (e.key === 'Escape') handleCancelProject()
+                    }}
+                    onBlur={() => handleSubmitProject()}
+                    className="flex-1 bg-background border border-border rounded px-1.5 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Project name"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {projects.length === 0 && !isCreatingProject && (
                 <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                  No chats yet
+                  No projects yet
                 </div>
               )}
             </div>
           )}
 
           {/* Folders Section */}
-          <WideHeader
-            title="All Folders"
-            isOpen={foldersOpen}
-            onToggle={() => setFoldersOpen(!foldersOpen)}
-            onTitleClick={() => setNotesFilter({ type: 'folder', value: '' })}
-            onAdd={handleCreateFolder}
-            isSelected={notesFilter.type === 'folder' && notesFilter.value === ''}
-          />
+          {(() => {
+            const currentProject = currentProjectId ? projects.find((p) => p.id === currentProjectId) : null
+            const projectFolder = currentProject?.notesFolder || ''
+            return (
+              <WideHeader
+                title={currentProjectId ? 'Folders' : 'All Folders'}
+                isOpen={foldersOpen}
+                onToggle={() => setFoldersOpen(!foldersOpen)}
+                onTitleClick={() => setNotesFilter({ type: 'folder', value: projectFolder })}
+                onAdd={handleCreateFolder}
+                isSelected={notesFilter.type === 'folder' && notesFilter.value === projectFolder}
+              />
+            )
+          })()}
           {foldersOpen && (
             <>
               <FolderBrowser />

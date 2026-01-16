@@ -11,7 +11,8 @@ import type {
   NoteInfo,
   FolderNode,
   TagNode,
-  NotesFilter
+  NotesFilter,
+  Project
 } from '@/types'
 
 // Open file tab type
@@ -28,9 +29,14 @@ export interface TabState {
 }
 
 interface AppState {
+  // Projects
+  projects: Project[]
+  currentProjectId: string | null // null = "All Projects" view
+
   // Threads
   threads: Thread[]
   currentThreadId: string | null
+  isNewChat: boolean // True when in ephemeral "new chat" mode (not yet persisted)
 
   // Messages for current thread
   messages: Message[]
@@ -74,8 +80,11 @@ interface AppState {
   activeTab: 'agent' | string // 'agent' or file path
   fileContents: Record<string, string> // path -> content cache
 
-  // Per-thread tab state persistence
+  // Per-thread tab state persistence (legacy, may be removed)
   tabStateByThread: Record<string, TabState>
+
+  // Per-project tab state persistence
+  tabStateByProject: Record<string, TabState>
 
   // Notes system state
   notes: NoteInfo[]
@@ -84,12 +93,21 @@ interface AppState {
   notesFilter: NotesFilter
   notesPath: string | null
 
-  // Actions
+  // Project actions
+  loadProjects: () => Promise<void>
+  createProject: (name: string) => Promise<Project>
+  selectProject: (projectId: string | null) => void
+  deleteProject: (projectId: string) => Promise<void>
+  updateProject: (projectId: string, updates: Partial<Project>) => Promise<void>
+
+  // Thread actions
   loadThreads: () => Promise<void>
   createThread: (metadata?: Record<string, unknown>) => Promise<Thread>
   selectThread: (threadId: string) => Promise<void>
   deleteThread: (threadId: string) => Promise<void>
   updateThread: (threadId: string, updates: Partial<Thread>) => Promise<void>
+  startNewChat: () => void // Enter ephemeral "new chat" mode
+  ensureThread: () => Promise<string> // Create thread if in new chat mode, return thread ID
 
   // Message actions
   appendMessage: (message: Message) => void
@@ -161,8 +179,11 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
+  projects: [],
+  currentProjectId: null,
   threads: [],
   currentThreadId: null,
+  isNewChat: true, // Start in new chat mode
   messages: [],
   pendingApproval: null,
   todos: [],
@@ -182,6 +203,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTab: 'agent',
   fileContents: {},
   tabStateByThread: {},
+  tabStateByProject: {},
 
   // Notes system initial state
   notes: [],
@@ -190,13 +212,116 @@ export const useAppStore = create<AppState>((set, get) => ({
   notesFilter: { type: 'smart', value: 'all' },
   notesPath: null,
 
+  // Project actions
+  loadProjects: async () => {
+    const projects = await window.api.projects.list()
+    set({ projects })
+  },
+
+  createProject: async (name: string) => {
+    const project = await window.api.projects.create({ name })
+    set((state) => ({ projects: [project, ...state.projects] }))
+    // Switch to the new project
+    get().selectProject(project.id)
+    return project
+  },
+
+  selectProject: (projectId: string | null) => {
+    const state = get()
+    const { currentProjectId, loadThreads, loadNotes, loadFolders, loadTags, projects, notesPath, tabStateByProject } = state
+    if (currentProjectId === projectId) return
+
+    // Save current project's tab state before switching
+    let updatedTabStateByProject = tabStateByProject
+    if (currentProjectId !== null) {
+      updatedTabStateByProject = {
+        ...tabStateByProject,
+        [currentProjectId]: {
+          openFiles: state.openFiles,
+          activeTab: state.activeTab,
+          fileContents: state.fileContents
+        }
+      }
+    }
+
+    // Find the project to get its folder
+    const project = projectId ? projects.find((p) => p.id === projectId) : null
+    
+    // Build the workspace path for this project
+    const projectWorkspacePath = project && notesPath 
+      ? `${notesPath}/${project.notesFolder}` 
+      : null
+
+    // Restore tab state for the target project (or default to empty)
+    const savedTabState = projectId ? updatedTabStateByProject[projectId] : null
+    const newTabState = savedTabState || {
+      openFiles: [],
+      activeTab: 'agent' as const,
+      fileContents: {}
+    }
+    
+    set({
+      currentProjectId: projectId,
+      currentThreadId: null,
+      isNewChat: true,
+      messages: [],
+      // Restore tab state for this project
+      openFiles: newTabState.openFiles,
+      activeTab: newTabState.activeTab,
+      fileContents: newTabState.fileContents,
+      // Save updated tab state
+      tabStateByProject: updatedTabStateByProject,
+      // Set workspace to project folder
+      workspacePath: projectWorkspacePath,
+      workspaceFiles: []
+    })
+
+    // If selecting a project, set the notes filter to that project's folder
+    if (project) {
+      set({ notesFilter: { type: 'folder', value: project.notesFolder } })
+    } else {
+      // "All Projects" - show all notes
+      set({ notesFilter: { type: 'smart', value: 'all' } })
+    }
+
+    // Reload threads for this project scope
+    loadThreads()
+    loadNotes()
+    loadFolders()
+    loadTags()
+  },
+
+  deleteProject: async (projectId: string) => {
+    await window.api.projects.delete(projectId)
+    set((state) => ({
+      projects: state.projects.filter((p) => p.id !== projectId),
+      // If we deleted the current project, switch to "All Projects"
+      currentProjectId: state.currentProjectId === projectId ? null : state.currentProjectId
+    }))
+    // Reload threads if we switched project
+    if (get().currentProjectId === null) {
+      get().loadThreads()
+    }
+  },
+
+  updateProject: async (projectId: string, updates: Partial<Project>) => {
+    const project = await window.api.projects.update(projectId, updates)
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === projectId ? project : p))
+    }))
+  },
+
   // Thread actions
   loadThreads: async () => {
-    const threads = await window.api.threads.list()
+    const { currentProjectId, isNewChat } = get()
+    // If no project selected (All Projects view), get all threads
+    // If a project is selected, get only that project's threads
+    const threads = await window.api.threads.list(currentProjectId === null ? undefined : currentProjectId)
     set({ threads })
 
-    // Select first thread if none selected
-    if (!get().currentThreadId && threads.length > 0) {
+    // Select first thread if none selected AND not in new chat mode
+    // (new chat mode means user wants to start fresh, don't auto-select)
+    if (!get().currentThreadId && !isNewChat && threads.length > 0) {
       await get().selectThread(threads[0].thread_id)
     }
   },
@@ -218,14 +343,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    const thread = await window.api.threads.create(metadata)
+    // Create thread with current project ID (or null for unassigned)
+    const thread = await window.api.threads.create({
+      metadata,
+      projectId: currentState.currentProjectId
+    })
     set((state) => ({
       threads: [thread, ...state.threads],
       currentThreadId: thread.thread_id,
+      isNewChat: false, // Now we have a real thread
       messages: [],
       todos: [],
       workspaceFiles: [],
-      workspacePath: null,
+      // Keep workspacePath - it may have been pre-set (e.g., from project selection)
       subagents: [],
       // Reset tabs for new thread
       openFiles: [],
@@ -237,44 +367,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   selectThread: async (threadId: string) => {
-    // Do all state updates in a single set() to avoid race conditions
-    set((state) => {
-      // Build updated tabStateByThread - save current thread's tab state
-      let updatedTabStateByThread = state.tabStateByThread
-      if (state.currentThreadId && state.currentThreadId !== threadId) {
-        updatedTabStateByThread = {
-          ...updatedTabStateByThread,
-          [state.currentThreadId]: {
-            openFiles: state.openFiles,
-            activeTab: state.activeTab,
-            fileContents: state.fileContents
-          }
-        }
-      }
-
-      // Restore the new thread's tab state (or default to empty)
-      const savedTabState = updatedTabStateByThread[threadId]
-      const newTabState = savedTabState || {
-        openFiles: [],
-        activeTab: 'agent',
-        fileContents: {}
-      }
-
-      return {
-        currentThreadId: threadId,
-        messages: [],
-        todos: [],
-        workspaceFiles: [],
-        workspacePath: null,
-        subagents: [],
-        // Update tabStateByThread with current thread's state saved
-        tabStateByThread: updatedTabStateByThread,
-        // Restore tab state for this thread
-        openFiles: newTabState.openFiles,
-        activeTab: newTabState.activeTab,
-        fileContents: newTabState.fileContents
-      }
-    })
+    // Update thread selection but preserve open files/tabs
+    // Notes belong to the project, not the thread, so switching threads
+    // shouldn't close notes
+    set((state) => ({
+      currentThreadId: threadId,
+      isNewChat: false, // Selecting an existing thread
+      messages: [],
+      todos: [],
+      workspaceFiles: [],
+      // Keep workspacePath - will be loaded from thread metadata below
+      subagents: []
+      // DON'T reset openFiles, activeTab, fileContents - notes persist across threads
+    }))
 
     // Load workspace path from thread metadata
     try {
@@ -430,6 +535,42 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       threads: state.threads.map((t) => (t.thread_id === threadId ? updated : t))
     }))
+  },
+
+  startNewChat: () => {
+    // Enter ephemeral "new chat" mode - clear current thread but keep UI ready
+    set({
+      currentThreadId: null,
+      isNewChat: true,
+      messages: [],
+      todos: [],
+      workspaceFiles: [],
+      subagents: [],
+      // Keep workspace path so user doesn't have to re-select
+      // Reset tabs for new chat
+      openFiles: [],
+      activeTab: 'agent',
+      fileContents: {}
+    })
+  },
+
+  ensureThread: async () => {
+    const state = get()
+    // If we already have a thread, return it
+    if (state.currentThreadId) {
+      return state.currentThreadId
+    }
+    // Create a new thread (this will set isNewChat to false)
+    const thread = await get().createThread({
+      title: `Chat ${new Date().toLocaleDateString()}`
+    })
+    
+    // If we have a pre-set workspace path (e.g., from project selection), save it to the thread
+    if (state.workspacePath) {
+      await window.api.workspace.set(thread.thread_id, state.workspacePath)
+    }
+    
+    return thread.thread_id
   },
 
   // Message actions

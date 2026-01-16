@@ -4,6 +4,7 @@ import { registerAgentHandlers } from './ipc/agent'
 import { registerThreadHandlers } from './ipc/threads'
 import { registerModelHandlers } from './ipc/models'
 import { registerNotesHandlers } from './ipc/notes'
+import { registerProjectHandlers } from './ipc/projects'
 import { initializeDatabase } from './db'
 
 let mainWindow: BrowserWindow | null = null
@@ -87,6 +88,7 @@ app.whenReady().then(async () => {
   registerThreadHandlers(ipcMain)
   registerModelHandlers(ipcMain)
   registerNotesHandlers(ipcMain)
+  registerProjectHandlers(ipcMain)
 
   createWindow()
 

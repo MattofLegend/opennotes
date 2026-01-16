@@ -35,7 +35,13 @@ function filterNotes(notes: NoteInfo[], filter: { type: string; value: string })
           return notes.filter((n) => !n.isDeleted)
       }
     case 'folder':
-      return notes.filter((n) => !n.isDeleted && n.folder === filter.value)
+      // Show notes in this folder and all subfolders
+      // e.g., filter "project-x" matches notes in "project-x", "project-x/subfolder", etc.
+      return notes.filter((n) => {
+        if (n.isDeleted) return false
+        if (filter.value === '') return true // Empty = all folders
+        return n.folder === filter.value || n.folder.startsWith(filter.value + '/')
+      })
     case 'tag':
       // Filter notes that have this tag or a child tag
       // e.g., filter "work" matches notes with #work, #work/meeting, etc.

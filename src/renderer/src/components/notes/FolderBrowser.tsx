@@ -13,10 +13,22 @@ import {
 } from '@/components/ui/context-menu'
 
 export function FolderBrowser(): React.JSX.Element {
-  const { folders, notesFilter, setNotesFilter, createFolder, deleteFolder } = useAppStore()
+  const { folders, notesFilter, setNotesFilter, createFolder, deleteFolder, currentProjectId, projects } =
+    useAppStore()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [isCreating, setIsCreating] = useState<string | null>(null) // Parent folder path or '' for root
   const [newFolderName, setNewFolderName] = useState('')
+
+  // Get the current project's folder if we're in a project
+  const currentProject = currentProjectId ? projects.find((p) => p.id === currentProjectId) : null
+  const projectFolder = currentProject?.notesFolder || null
+
+  // Filter folders based on project scope
+  const scopedFolders = projectFolder
+    ? // In project: find the project folder and show its children
+      folders.find((f) => f.path === projectFolder)?.children || []
+    : // All projects: show all root folders
+      folders
 
   const toggleExpand = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -35,11 +47,13 @@ export function FolderBrowser(): React.JSX.Element {
   }
 
   const handleCreateFolder = async (parentPath?: string): Promise<void> => {
-    setIsCreating(parentPath ?? '')
+    // If in a project and no parent specified, use the project folder as parent
+    const effectiveParent = parentPath ?? (projectFolder || '')
+    setIsCreating(effectiveParent)
     setNewFolderName('')
     // Expand the parent if creating in a subfolder
-    if (parentPath) {
-      setExpanded((prev) => new Set([...prev, parentPath]))
+    if (effectiveParent) {
+      setExpanded((prev) => new Set([...prev, effectiveParent]))
     }
   }
 
@@ -75,7 +89,7 @@ export function FolderBrowser(): React.JSX.Element {
   return (
     <div className="py-1">
       {/* Folder tree */}
-      {folders.map((folder) => (
+      {scopedFolders.map((folder) => (
         <FolderItem
           key={folder.path}
           folder={folder}

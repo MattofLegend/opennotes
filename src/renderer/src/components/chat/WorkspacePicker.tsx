@@ -41,14 +41,17 @@ export function WorkspacePicker(): React.JSX.Element {
   const [loading, setLoading] = useState(false)
 
   // Load workspace path and files for current thread
+  // Only load from backend if we have a real thread (not new chat mode)
   useEffect(() => {
     async function loadWorkspace(): Promise<void> {
+      // Only load from backend if we have a real thread ID
+      // Don't overwrite workspace path that was pre-set (e.g., from project selection)
       if (currentThreadId) {
         const path = await window.api.workspace.get(currentThreadId)
-        setWorkspacePath(path)
-
-        // If a folder is linked, load files from disk
+        // Only update if we got a path from the backend
+        // This preserves any pre-set workspace (like from project selection)
         if (path) {
+          setWorkspacePath(path)
           const result = await window.api.workspace.loadFromDisk(currentThreadId)
           if (result.success && result.files) {
             setWorkspaceFiles(result.files)

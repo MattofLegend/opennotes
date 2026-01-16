@@ -1,4 +1,4 @@
-import type { Thread, ModelConfig, StreamEvent, HITLDecision } from '../main/types'
+import type { Thread, ModelConfig, StreamEvent, HITLDecision, Project } from '../main/types'
 
 interface ElectronAPI {
   ipcRenderer: {
@@ -30,13 +30,20 @@ interface CustomAPI {
     cancel: (threadId: string) => Promise<void>
   }
   threads: {
-    list: () => Promise<Thread[]>
+    list: (projectId?: string | null) => Promise<Thread[]>
     get: (threadId: string) => Promise<Thread | null>
-    create: (metadata?: Record<string, unknown>) => Promise<Thread>
-    update: (threadId: string, updates: Partial<Thread>) => Promise<Thread>
+    create: (options?: { metadata?: Record<string, unknown>; projectId?: string | null }) => Promise<Thread>
+    update: (threadId: string, updates: Partial<Thread> & { project_id?: string | null }) => Promise<Thread>
     delete: (threadId: string) => Promise<void>
     getHistory: (threadId: string) => Promise<unknown[]>
     generateTitle: (message: string) => Promise<string>
+  }
+  projects: {
+    list: () => Promise<Project[]>
+    get: (projectId: string) => Promise<Project | null>
+    create: (params: { name: string }) => Promise<Project>
+    update: (projectId: string, updates: { name?: string; notesFolder?: string }) => Promise<Project>
+    delete: (projectId: string) => Promise<void>
   }
   models: {
     list: () => Promise<ModelConfig[]>
@@ -89,6 +96,7 @@ interface CustomAPI {
       isFavorite: boolean
       isDeleted: boolean
       folder: string
+      tags: string[]
     }>>
     listFolders: () => Promise<Array<{
       name: string
@@ -104,6 +112,7 @@ interface CustomAPI {
       isFavorite: boolean
       isDeleted: boolean
       folder: string
+      tags: string[]
     }>
     createFolder: (params: { parentFolder?: string; name: string }) => Promise<{
       name: string
@@ -118,6 +127,7 @@ interface CustomAPI {
       isFavorite: boolean
       isDeleted: boolean
       folder: string
+      tags: string[]
     }>
     delete: (path: string) => Promise<boolean>
     restore: (params: { trashPath: string; targetFolder?: string }) => Promise<{
@@ -128,6 +138,7 @@ interface CustomAPI {
       isFavorite: boolean
       isDeleted: boolean
       folder: string
+      tags: string[]
     }>
     permanentDelete: (trashPath: string) => Promise<boolean>
     toggleFavorite: (path: string) => Promise<{
@@ -138,6 +149,7 @@ interface CustomAPI {
       isFavorite: boolean
       isDeleted: boolean
       folder: string
+      tags: string[]
     }>
     getTags: () => Promise<Array<{
       name: string

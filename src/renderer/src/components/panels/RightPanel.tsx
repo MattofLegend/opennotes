@@ -151,7 +151,7 @@ function ModeTabBar(): React.JSX.Element {
 }
 
 export function RightPanel(): React.JSX.Element {
-  const { todos, workspaceFiles, subagents, rightPanelMode, currentThreadId } = useAppStore()
+  const { todos, workspaceFiles, subagents, rightPanelMode, currentThreadId, isNewChat } = useAppStore()
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [tasksOpen, setTasksOpen] = useState(true)
@@ -348,8 +348,8 @@ export function RightPanel(): React.JSX.Element {
 
       {rightPanelMode === 'chat' ? (
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-          {currentThreadId ? (
-            <ChatContainer threadId={currentThreadId} />
+          {currentThreadId || isNewChat ? (
+            <ChatContainer threadId={currentThreadId || ''} />
           ) : (
             <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
               Select a thread to start chatting

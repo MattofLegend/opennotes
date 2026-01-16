@@ -11,7 +11,7 @@ interface TabbedPanelProps {
 }
 
 export function TabbedPanel({ threadId, showTabBar = true }: TabbedPanelProps) {
-  const { activeTab, openFiles, rightPanelMode, notesPath } = useAppStore()
+  const { activeTab, openFiles, rightPanelMode, notesPath, isNewChat } = useAppStore()
 
   const isAgentTab = activeTab === 'agent'
   const activeFile = openFiles.find((f) => f.path === activeTab)
@@ -22,7 +22,9 @@ export function TabbedPanel({ threadId, showTabBar = true }: TabbedPanelProps) {
   // Get relative path for notes (strip notesPath prefix)
   const noteRelativePath = isNote ? activeFile.path.slice(notesPath.length + 1) : null
 
-  const showChat = isAgentTab && !chatInRightPanel
+  // Show chat if we have a thread OR we're in new chat mode (ready to create one)
+  const hasThreadOrNewChat = (threadId && threadId.length > 0) || isNewChat
+  const showChat = isAgentTab && !chatInRightPanel && hasThreadOrNewChat
   const showFile = activeFile !== undefined
   const showEmptyState = !showChat && !showFile
 
@@ -48,9 +50,13 @@ export function TabbedPanel({ threadId, showTabBar = true }: TabbedPanelProps) {
           <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground gap-3">
             <FileCode className="size-12 opacity-30" />
             <div className="text-center">
-              <div className="text-sm font-medium">File Viewer</div>
+              <div className="text-sm font-medium">
+                {isAgentTab && !hasThreadOrNewChat ? 'No Chat Selected' : 'No File Open'}
+              </div>
               <div className="text-xs mt-1 opacity-75">
-                Click a file in the sidebar to view it here
+                {isAgentTab && !hasThreadOrNewChat
+                  ? 'Create or select a chat to begin'
+                  : 'Click a note in the list to view it here'}
               </div>
             </div>
           </div>

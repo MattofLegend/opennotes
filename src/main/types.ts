@@ -9,6 +9,16 @@ export interface Thread {
   status: ThreadStatus
   thread_values?: Record<string, unknown>
   title?: string
+  project_id?: string | null
+}
+
+// Project type
+export interface Project {
+  id: string
+  name: string
+  notesFolder: string
+  createdAt: Date
+  updatedAt: Date
 }
 
 // Run types

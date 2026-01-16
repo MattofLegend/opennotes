@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAppStore } from '@/lib/store'
 import { MessageBubble } from './MessageBubble'
 import { ModelSwitcher } from './ModelSwitcher'
+import { ChatSelector } from './ChatSelector'
 import { Folder } from 'lucide-react'
 import { WorkspacePicker, selectWorkspaceFolder } from './WorkspacePicker'
 import { ChatTodos } from './ChatTodos'
@@ -70,6 +71,8 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
     todos,
     errorByThread,
     workspacePath,
+    isNewChat,
+    currentThreadId,
     setTodos,
     setWorkspaceFiles,
     setWorkspacePath,
@@ -80,11 +83,13 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
     generateTitleForFirstMessage,
     setLoadingThreadId,
     setThreadError,
-    clearThreadError
+    clearThreadError,
+    ensureThread
   } = useAppStore()
 
-  // Get error for current thread
-  const threadError = errorByThread[threadId] || null
+  // Get error for current thread (or new-chat placeholder)
+  const activeThreadId = currentThreadId || 'new-chat'
+  const threadError = errorByThread[activeThreadId] || null
 
   // Debug: log pendingApproval state (moved detailed log after displayMessages)
 
@@ -163,9 +168,11 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
   )
 
   // Use the useStream hook with our custom transport
+  // Use store's currentThreadId for reactivity, fall back to prop or placeholder
+  const streamThreadId = currentThreadId || threadId || 'pending'
   const stream = useStream<DeepAgent>({
     transport,
-    threadId,
+    threadId: streamThreadId,
     messagesKey: 'messages',
     onCustomEvent: (data): void => {
       handleCustomEvent(data as CustomEventData)
@@ -173,7 +180,7 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
     onError: (error): void => {
       console.error('[ChatContainer] Stream error:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
-      setThreadError(threadId, errorMessage)
+      setThreadError(activeThreadId, errorMessage)
     }
   })
 
@@ -394,13 +401,17 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
 
     // Check if workspace is selected
     if (!workspacePath) {
-      setThreadError(threadId, 'Please select a workspace folder before sending messages.')
+      const errorId = currentThreadId || 'new-chat'
+      setThreadError(errorId, 'Please select a workspace folder before sending messages.')
       return
     }
 
+    // Ensure we have a thread (creates one if in new chat mode)
+    const activeThreadId = await ensureThread()
+
     // Clear any previous error when submitting a new message
     if (threadError) {
-      clearThreadError(threadId)
+      clearThreadError(activeThreadId)
     }
 
     // Clear any pending approval from previous turns
@@ -425,7 +436,7 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
 
     // Generate title for first message
     if (isFirstMessage) {
-      generateTitleForFirstMessage(threadId, message)
+      generateTitleForFirstMessage(activeThreadId, message)
     }
 
     // Submit via useStream
@@ -435,7 +446,7 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
       },
       {
         config: {
-          configurable: { thread_id: threadId }
+          configurable: { thread_id: activeThreadId }
         }
       }
     )
@@ -471,6 +482,15 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
 
   return (
     <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+      {/* Chat header with selector */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/50 shrink-0">
+        <ChatSelector />
+        <div className="flex items-center gap-2">
+          <ModelSwitcher />
+          <WorkspacePicker />
+        </div>
+      </div>
+
       {/* Messages */}
       <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="p-4">
@@ -575,11 +595,6 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
                   </Button>
                 )}
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ModelSwitcher />
-              <div className="w-px h-4 bg-border" />
-              <WorkspacePicker />
             </div>
           </div>
         </form>

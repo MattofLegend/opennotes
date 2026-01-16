@@ -21,7 +21,7 @@ const RIGHT_MAX = 450
 const RIGHT_DEFAULT = 320
 
 function App(): React.JSX.Element {
-  const { currentThreadId, loadThreads, createThread } = useAppStore()
+  const { currentThreadId, loadThreads, createThread, loadProjects } = useAppStore()
   const [isLoading, setIsLoading] = useState(true)
   const [leftWidth, setLeftWidth] = useState(LEFT_DEFAULT)
   const [notesListWidth, setNotesListWidth] = useState(NOTES_LIST_DEFAULT)
@@ -112,6 +112,9 @@ function App(): React.JSX.Element {
   useEffect(() => {
     async function init(): Promise<void> {
       try {
+        // Load projects first
+        await loadProjects()
+        // Load threads (scoped to current project, which is null = all)
         await loadThreads()
         // Create a default thread if none exist
         const threads = useAppStore.getState().threads
@@ -125,7 +128,7 @@ function App(): React.JSX.Element {
       }
     }
     init()
-  }, [loadThreads, createThread])
+  }, [loadProjects, loadThreads, createThread])
 
   if (isLoading) {
     return (
@@ -153,60 +156,38 @@ function App(): React.JSX.Element {
         <span className="app-badge-version">{__APP_VERSION__}</span>
       </div>
 
-      {/* Left + Center column */}
+      {/* Left Sidebar - Full height */}
+      <div style={{ width: leftWidth }} className="shrink-0 flex flex-col h-full">
+        {/* Titlebar spacer for traffic lights + badge */}
+        <div className="h-9 shrink-0 app-drag-region bg-sidebar" />
+        <NotesSidebar />
+      </div>
+
+      <ResizeHandle onDrag={handleLeftResize} />
+
+      {/* Notes List Panel - Full height (NotesList has its own header with safe padding) */}
+      <div style={{ width: notesListWidth }} className="shrink-0 h-full">
+        <NotesList />
+      </div>
+
+      <ResizeHandle onDrag={handleNotesListResize} />
+
+      {/* Center column - with titlebar tabs */}
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Titlebar row with tabs integrated */}
-        <div className="flex h-9 w-full shrink-0 app-drag-region bg-sidebar">
-          {/* Left section - spacer for traffic lights + badge (matches left sidebar width) */}
-          <div style={{ width: leftWidth }} className="shrink-0" />
-
-          {/* Resize handle spacer */}
-          <div className="w-[1px] shrink-0" />
-
-          {/* Notes list spacer */}
-          <div style={{ width: notesListWidth }} className="shrink-0" />
-
-          {/* Resize handle spacer */}
-          <div className="w-[1px] shrink-0" />
-
-          {/* Center section - Tab bar */}
-          <div className="flex-1 min-w-0">
-            {currentThreadId && <TabBar className="h-full border-b-0" />}
-          </div>
+        {/* Titlebar row with tabs */}
+        <div className="h-9 shrink-0 app-drag-region bg-sidebar">
+          <TabBar className="h-full border-b-0" />
         </div>
 
-        {/* Main content area */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Sidebar - Smart Views, Threads, Folders, Tags */}
-          <div style={{ width: leftWidth }} className="shrink-0">
-            <NotesSidebar />
-          </div>
-
-          <ResizeHandle onDrag={handleLeftResize} />
-
-          {/* Notes List Panel */}
-          <div style={{ width: notesListWidth }} className="shrink-0">
-            <NotesList />
-          </div>
-
-          <ResizeHandle onDrag={handleNotesListResize} />
-
-          {/* Center - Content Panel (Agent Chat + File Viewer) */}
-          <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
-            {currentThreadId ? (
-              <TabbedPanel threadId={currentThreadId} showTabBar={false} />
-            ) : (
-              <div className="flex flex-1 items-center justify-center text-muted-foreground">
-                Select or create a thread to begin
-              </div>
-            )}
-          </main>
-        </div>
+        {/* Center - Content Panel (Agent Chat + File Viewer) */}
+        <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
+          <TabbedPanel threadId={currentThreadId || ''} showTabBar={false} />
+        </main>
       </div>
 
       <ResizeHandle onDrag={handleRightResize} />
 
-      {/* Right Panel - Status Panels (full height) */}
+      {/* Right Panel - Full height */}
       <div style={{ width: rightWidth }} className="shrink-0">
         <RightPanel />
       </div>

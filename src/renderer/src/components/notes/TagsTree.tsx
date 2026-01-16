@@ -1,12 +1,85 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Hash, ChevronRight, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
-import type { TagNode } from '@/types'
+import type { TagNode, NoteInfo } from '@/types'
+
+// Build tag tree from notes within a folder scope
+function buildTagTreeFromNotes(notes: NoteInfo[], folderScope: string | null): TagNode[] {
+  // Filter notes by folder scope if specified
+  const scopedNotes = folderScope
+    ? notes.filter((n) => !n.isDeleted && (n.folder === folderScope || n.folder.startsWith(folderScope + '/')))
+    : notes.filter((n) => !n.isDeleted)
+
+  // Collect all tags and their counts
+  const tagCounts = new Map<string, number>()
+  for (const note of scopedNotes) {
+    for (const tag of note.tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)
+    }
+  }
+
+  // Build tree structure
+  const rootTags: TagNode[] = []
+  const tagMap = new Map<string, TagNode>()
+
+  // Sort tags for consistent ordering
+  const sortedTags = Array.from(tagCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+
+  for (const [fullPath, count] of sortedTags) {
+    const parts = fullPath.split('/')
+    let currentPath = ''
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      const parentPath = currentPath
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+
+      if (!tagMap.has(currentPath)) {
+        const node: TagNode = {
+          name: part,
+          fullPath: currentPath,
+          count: 0,
+          children: []
+        }
+        tagMap.set(currentPath, node)
+
+        if (parentPath) {
+          const parent = tagMap.get(parentPath)
+          if (parent) {
+            parent.children.push(node)
+          }
+        } else {
+          rootTags.push(node)
+        }
+      }
+
+      // Add count to this tag if it's the full path
+      if (currentPath === fullPath) {
+        const node = tagMap.get(currentPath)
+        if (node) {
+          node.count = count
+        }
+      }
+    }
+  }
+
+  return rootTags
+}
 
 export function TagsTree(): React.JSX.Element {
-  const { tags, notesFilter, setNotesFilter } = useAppStore()
+  const { notes, notesFilter, setNotesFilter, currentProjectId, projects } = useAppStore()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  // Get the current project's folder for scoping
+  const currentProject = currentProjectId ? projects.find((p) => p.id === currentProjectId) : null
+  const projectFolder = currentProject?.notesFolder || null
+
+  // Build scoped tags from notes within the project folder
+  const scopedTags = useMemo(
+    () => buildTagTreeFromNotes(notes, projectFolder),
+    [notes, projectFolder]
+  )
 
   const toggleExpand = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -26,7 +99,7 @@ export function TagsTree(): React.JSX.Element {
 
   const isSelected = notesFilter.type === 'tag'
 
-  if (tags.length === 0) {
+  if (scopedTags.length === 0) {
     return (
       <div className="px-3 py-4 text-center text-xs text-muted-foreground">
         No tags yet
@@ -39,7 +112,7 @@ export function TagsTree(): React.JSX.Element {
 
   return (
     <div className="py-1">
-      {tags.map((tag) => (
+      {scopedTags.map((tag) => (
         <TagItem
           key={tag.fullPath}
           tag={tag}

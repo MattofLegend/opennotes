@@ -12,7 +12,7 @@ export function TabBar({ className }: TabBarProps) {
 
   return (
     <div className={cn(
-      "flex items-center h-9 border-b border-border bg-sidebar overflow-x-auto scrollbar-hide",
+      "flex items-center h-9 border-b border-border bg-sidebar overflow-x-auto scrollbar-hide app-no-drag",
       className
     )}>
       {showAgentTab && (

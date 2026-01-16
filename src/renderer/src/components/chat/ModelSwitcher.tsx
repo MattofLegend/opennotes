@@ -117,26 +117,23 @@ export function ModelSwitcher() {
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          <button
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            title={selectedModel?.name || 'Select model'}
           >
             {selectedModel ? (
-              <>
-                {PROVIDER_ICONS[selectedModel.provider]?.({ className: 'size-3.5' })}
-                <span className="font-mono">{selectedModel.id}</span>
-              </>
+              PROVIDER_ICONS[selectedModel.provider]?.({ className: 'size-4' })
             ) : (
-              <span>Select model</span>
+              <AlertCircle className="size-4" />
             )}
-            <ChevronDown className="size-3" />
-          </Button>
+          </button>
         </PopoverTrigger>
         <PopoverContent 
           className="w-[420px] p-0 bg-background border-border" 
           align="start"
+          side="top"
           sideOffset={8}
+          collisionPadding={16}
         >
           <div className="flex min-h-[240px]">
             {/* Provider column */}
@@ -194,21 +191,21 @@ export function ModelSwitcher() {
                 <div className="flex flex-col h-[200px]">
                   <div className="overflow-y-auto flex-1 space-y-0.5">
                     {filteredModels.map((model) => (
-                      <button
-                        key={model.id}
-                        onClick={() => handleModelSelect(model.id)}
-                        className={cn(
-                          "w-full flex items-center gap-1.5 px-2 py-1 rounded-sm text-xs transition-colors text-left font-mono",
-                          currentModel === model.id
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        )}
-                      >
-                        <span className="flex-1 truncate">{model.id}</span>
-                        {currentModel === model.id && (
-                          <Check className="size-3.5 shrink-0 text-foreground" />
-                        )}
-                      </button>
+                    <button
+                      key={model.id}
+                      onClick={() => handleModelSelect(model.id)}
+                      className={cn(
+                        "w-full flex items-center gap-1.5 px-2 py-1 rounded-sm text-xs transition-colors text-left",
+                        currentModel === model.id
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      <span className="flex-1 truncate">{model.name}</span>
+                      {currentModel === model.id && (
+                        <Check className="size-3.5 shrink-0 text-foreground" />
+                      )}
+                    </button>
                     ))}
                     
                     {filteredModels.length === 0 && (

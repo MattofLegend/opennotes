@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Plus,
   FolderKanban,
@@ -8,7 +8,7 @@ import {
   Clock,
   Star,
   Trash,
-  ChevronRight,
+  ChevronLeft,
   ChevronDown,
   Layers
 } from 'lucide-react'
@@ -49,7 +49,9 @@ export function NotesSidebar(): React.JSX.Element {
     loadNotes,
     loadFolders,
     loadTags,
-    createFolder
+    createFolder,
+    moveNote,
+    moveFolder
   } = useAppStore()
 
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
@@ -66,6 +68,9 @@ export function NotesSidebar(): React.JSX.Element {
   // Creating new folder state
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+
+  // Drag-over state for drop targets
+  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -147,8 +152,58 @@ export function NotesSidebar(): React.JSX.Element {
     setNewFolderName('')
   }
 
+  // Drag and drop handlers for projects
+  const handleDragEnter = useCallback((e: React.DragEvent, projectId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log('[NotesSidebar] Drag enter project:', projectId, 'types:', e.dataTransfer.types)
+    setDragOverProjectId(projectId)
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only clear if we're leaving the element itself, not entering a child
+    const relatedTarget = e.relatedTarget as Node | null
+    const currentTarget = e.currentTarget as Node
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setDragOverProjectId(null)
+    }
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent, project: { id: string; notesFolder: string }) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOverProjectId(null)
+
+    const notePath = e.dataTransfer.getData('application/x-note-path')
+    const folderPath = e.dataTransfer.getData('application/x-folder-path')
+
+    console.log('[NotesSidebar] Drop event:', { notePath, folderPath, targetFolder: project.notesFolder })
+
+    try {
+      if (notePath) {
+        // Move note to project folder
+        console.log('[NotesSidebar] Moving note:', notePath, 'to', project.notesFolder)
+        await moveNote(notePath, project.notesFolder)
+      } else if (folderPath) {
+        // Move folder to project folder
+        console.log('[NotesSidebar] Moving folder:', folderPath, 'to', project.notesFolder)
+        await moveFolder(folderPath, project.notesFolder)
+      }
+    } catch (error) {
+      console.error('Failed to move item:', error)
+    }
+  }, [moveNote, moveFolder])
+
   return (
-    <aside className="flex h-full w-full flex-col border-r border-border bg-sidebar overflow-hidden">
+    <aside className="flex h-full w-full flex-col bg-sidebar overflow-hidden">
       <ScrollArea className="flex-1 min-h-0">
         <div
           className="flex flex-col"
@@ -163,11 +218,12 @@ export function NotesSidebar(): React.JSX.Element {
                 <div
                   key={view.id}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors text-sm',
+                    'flex items-center gap-1.5 py-1 pr-2 cursor-pointer transition-colors text-sm',
                     isSelected
                       ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                       : 'hover:bg-sidebar-accent/50'
                   )}
+                  style={{ paddingLeft: 12 }}
                   onClick={() => handleSmartViewClick(view.id)}
                 >
                   <Icon className="size-4 text-muted-foreground" />
@@ -193,48 +249,50 @@ export function NotesSidebar(): React.JSX.Element {
                   <ContextMenuTrigger asChild>
                     <div
                       className={cn(
-                        'group flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors overflow-hidden',
+                        'group flex items-center gap-1.5 pr-2 py-1 cursor-pointer transition-colors overflow-hidden text-sm',
                         currentProjectId === project.id
                           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                          : 'hover:bg-sidebar-accent/50'
+                          : 'hover:bg-sidebar-accent/50',
+                        dragOverProjectId === project.id && 'ring-2 ring-primary ring-inset bg-primary/10'
                       )}
+                      style={{ paddingLeft: 12 }}
                       onClick={() => {
                         if (editingProjectId !== project.id) {
                           selectProject(project.id)
                         }
                       }}
+                      onDragEnter={(e) => handleDragEnter(e, project.id)}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, project)}
                     >
                       <FolderKanban className="size-4 shrink-0 text-muted-foreground" />
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        {editingProjectId === project.id ? (
-                          <input
-                            type="text"
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onBlur={saveProjectName}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveProjectName()
-                              if (e.key === 'Escape') cancelEditingProject()
-                            }}
-                            className="w-full bg-background border border-border rounded px-1 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
-                            autoFocus
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                          <div className="text-sm truncate block">{project.name}</div>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="opacity-0 group-hover:opacity-100 shrink-0"
+                      {editingProjectId === project.id ? (
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onBlur={saveProjectName}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveProjectName()
+                            if (e.key === 'Escape') cancelEditingProject()
+                          }}
+                          className="flex-1 min-w-0 bg-background border border-border rounded px-1 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span className="flex-1 truncate">{project.name}</span>
+                      )}
+                      <button
+                        className="opacity-0 group-hover:opacity-100 shrink-0 p-0.5 hover:bg-sidebar-accent/50 rounded"
                         onClick={(e) => {
                           e.stopPropagation()
                           deleteProject(project.id)
                         }}
                       >
                         <Trash2 className="size-3" />
-                      </Button>
+                      </button>
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
@@ -349,11 +407,28 @@ function WideHeader({
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-3 py-2.5 mt-2 border-t border-border/50 transition-colors',
+        'flex items-center justify-between px-3 py-1 mt-1 border-t border-border/50 transition-colors',
         isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/30'
       )}
     >
-      <div className="flex items-center gap-2">
+      <span
+        className="text-sm font-medium text-foreground cursor-pointer"
+        onClick={onTitleClick || onToggle}
+      >
+        {title}
+      </span>
+      <div className="flex items-center gap-1">
+        {onAdd && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onAdd}
+            className="h-5 w-5 hover:bg-sidebar-accent"
+            title={`New ${title.replace('All ', '')}`}
+          >
+            <Plus className="size-3.5" />
+          </Button>
+        )}
         <button
           className="p-0.5 hover:bg-sidebar-accent/50 rounded cursor-pointer"
           onClick={onToggle}
@@ -361,27 +436,10 @@ function WideHeader({
           {isOpen ? (
             <ChevronDown className="size-4 text-muted-foreground" />
           ) : (
-            <ChevronRight className="size-4 text-muted-foreground" />
+            <ChevronLeft className="size-4 text-muted-foreground" />
           )}
         </button>
-        <span
-          className="text-sm font-medium text-foreground cursor-pointer"
-          onClick={onTitleClick || onToggle}
-        >
-          {title}
-        </span>
       </div>
-      {onAdd && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={onAdd}
-          className="h-6 w-6 hover:bg-sidebar-accent"
-          title={`New ${title.replace('All ', '')}`}
-        >
-          <Plus className="size-4" />
-        </Button>
-      )}
     </div>
   )
 }

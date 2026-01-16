@@ -363,6 +363,26 @@ const api = {
     // Open the notes directory in Finder
     openNotesFolder: (): Promise<boolean> => {
       return ipcRenderer.invoke('notes:openNotesFolder')
+    },
+    // Move a note to a new folder
+    move: (params: { sourcePath: string; targetFolder: string }): Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }> => {
+      return ipcRenderer.invoke('notes:move', params)
+    },
+    // Move a folder to a new parent folder
+    moveFolder: (params: { sourcePath: string; targetFolder: string }): Promise<{
+      name: string
+      path: string
+      children: unknown[]
+    }> => {
+      return ipcRenderer.invoke('notes:moveFolder', params)
     }
   }
 }

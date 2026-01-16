@@ -304,7 +304,9 @@
 .app-drag-region button,
 .app-drag-region input,
 .app-drag-region select,
-.app-drag-region a {
+.app-drag-region a,
+.app-drag-region [role="tab"],
+.app-drag-region .app-no-drag {
   -webkit-app-region: no-drag;
 }
 

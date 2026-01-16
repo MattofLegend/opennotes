@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { Folder, FolderOpen, ChevronRight, ChevronDown, Plus, Trash2, ExternalLink } from 'lucide-react'
+import { Folder, FolderOpen, ChevronLeft, ChevronDown, Plus, Trash2, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
@@ -84,6 +84,22 @@ export function FolderBrowser(): React.JSX.Element {
     }
   }
 
+  const handleDragStart = (e: React.DragEvent, folder: FolderNode): void => {
+    console.log('[FolderBrowser] Drag start:', folder.path)
+    // Set the data early in the event
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/x-folder-path', folder.path)
+    e.dataTransfer.setData('text/plain', folder.name)
+    
+    // Create a custom drag image
+    const dragEl = document.createElement('div')
+    dragEl.textContent = `📁 ${folder.name}`
+    dragEl.style.cssText = 'position: absolute; top: -1000px; padding: 8px 12px; background: var(--primary); color: var(--primary-foreground); border-radius: 4px; font-size: 12px; white-space: nowrap;'
+    document.body.appendChild(dragEl)
+    e.dataTransfer.setDragImage(dragEl, 0, 0)
+    setTimeout(() => document.body.removeChild(dragEl), 0)
+  }
+
   const isSelected = notesFilter.type === 'folder'
 
   return (
@@ -105,6 +121,7 @@ export function FolderBrowser(): React.JSX.Element {
           onNewFolderNameChange={setNewFolderName}
           onSubmitNewFolder={handleSubmitNewFolder}
           onCancelCreate={handleCancelCreate}
+          onDragStart={handleDragStart}
         />
       ))}
 
@@ -152,6 +169,7 @@ interface FolderItemProps {
   onNewFolderNameChange: (name: string) => void
   onSubmitNewFolder: () => void
   onCancelCreate: () => void
+  onDragStart: (e: React.DragEvent, folder: FolderNode) => void
 }
 
 function FolderItem({
@@ -167,7 +185,8 @@ function FolderItem({
   onDelete,
   onNewFolderNameChange,
   onSubmitNewFolder,
-  onCancelCreate
+  onCancelCreate,
+  onDragStart
 }: FolderItemProps): React.JSX.Element {
   const isExpanded = expanded.has(folder.path)
   const hasChildren = folder.children.length > 0
@@ -176,37 +195,22 @@ function FolderItem({
 
   return (
     <>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <div
-            className={cn(
-              'group flex items-center gap-1.5 py-1.5 pr-2 cursor-pointer transition-colors text-sm',
-              isSelected
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'hover:bg-sidebar-accent/50'
-            )}
-            style={{ paddingLeft }}
-            onClick={() => onSelect(folder.path)}
-          >
-            {/* Expand chevron */}
-            <button
-              className="w-4 h-4 flex items-center justify-center shrink-0"
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggle(folder.path)
-              }}
-            >
-              {hasChildren || isCreating === folder.path ? (
-                isExpanded ? (
-                  <ChevronDown className="size-3 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="size-3 text-muted-foreground" />
-                )
-              ) : (
-                <span className="w-3" />
+      <div
+        draggable
+        onDragStart={(e) => onDragStart(e, folder)}
+      >
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div
+              className={cn(
+                'group flex items-center gap-1.5 py-1 pr-2 cursor-pointer cursor-grab active:cursor-grabbing transition-colors text-sm',
+                isSelected
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'hover:bg-sidebar-accent/50'
               )}
-            </button>
-
+              style={{ paddingLeft }}
+              onClick={() => onSelect(folder.path)}
+            >
             {/* Folder icon */}
             {isExpanded ? (
               <FolderOpen className="size-4 text-status-warning shrink-0" />
@@ -216,6 +220,23 @@ function FolderItem({
 
             {/* Folder name */}
             <span className="flex-1 truncate">{folder.name}</span>
+
+            {/* Expand chevron - on the right */}
+            {(hasChildren || isCreating === folder.path) && (
+              <button
+                className="w-4 h-4 flex items-center justify-center shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggle(folder.path)
+                }}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                ) : (
+                  <ChevronLeft className="size-3 text-muted-foreground" />
+                )}
+              </button>
+            )}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
@@ -239,8 +260,9 @@ function FolderItem({
             <Trash2 className="size-4 mr-2" />
             Delete Folder
           </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+          </ContextMenuContent>
+        </ContextMenu>
+      </div>
 
       {/* Children and new folder input */}
       {isExpanded && (
@@ -261,6 +283,7 @@ function FolderItem({
               onNewFolderNameChange={onNewFolderNameChange}
               onSubmitNewFolder={onSubmitNewFolder}
               onCancelCreate={onCancelCreate}
+              onDragStart={onDragStart}
             />
           ))}
 

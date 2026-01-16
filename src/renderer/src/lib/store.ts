@@ -175,6 +175,8 @@ interface AppState {
   toggleNoteFavorite: (path: string) => Promise<void>
   updateNote: (path: string, content: string) => Promise<void>
   deleteFolder: (folderPath: string) => Promise<void>
+  moveNote: (sourcePath: string, targetFolder: string) => Promise<void>
+  moveFolder: (sourcePath: string, targetFolder: string) => Promise<void>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -872,6 +874,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteFolder: async (folderPath: string) => {
     await window.api.notes.deleteFolder(folderPath)
+    // Reload notes and folders
+    await get().loadNotes()
+    await get().loadFolders()
+    await get().loadTags()
+  },
+
+  moveNote: async (sourcePath: string, targetFolder: string) => {
+    await window.api.notes.move({ sourcePath, targetFolder })
+    // Reload notes
+    await get().loadNotes()
+    await get().loadTags()
+  },
+
+  moveFolder: async (sourcePath: string, targetFolder: string) => {
+    await window.api.notes.moveFolder({ sourcePath, targetFolder })
     // Reload notes and folders
     await get().loadNotes()
     await get().loadFolders()

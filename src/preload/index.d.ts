@@ -161,6 +161,20 @@ interface CustomAPI {
     getPath: () => Promise<string>
     showInFinder: (relativePath: string) => Promise<boolean>
     openNotesFolder: () => Promise<boolean>
+    move: (params: { sourcePath: string; targetFolder: string }) => Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }>
+    moveFolder: (params: { sourcePath: string; targetFolder: string }) => Promise<{
+      name: string
+      path: string
+      children: unknown[]
+    }>
   }
 }
 

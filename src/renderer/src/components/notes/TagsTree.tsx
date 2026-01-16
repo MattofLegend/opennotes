@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { Hash, ChevronRight, ChevronDown } from 'lucide-react'
+import { Hash, ChevronLeft, ChevronDown } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { TagNode, NoteInfo } from '@/types'
@@ -153,7 +153,7 @@ function TagItem({
     <>
       <div
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 pr-2 cursor-pointer transition-colors text-sm',
+          'group flex items-center gap-1.5 py-1 pr-2 cursor-pointer transition-colors text-sm',
           isSelected
             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
             : 'hover:bg-sidebar-accent/50'
@@ -161,25 +161,6 @@ function TagItem({
         style={{ paddingLeft }}
         onClick={() => onSelect(tag.fullPath)}
       >
-        {/* Expand chevron */}
-        <button
-          className="w-4 h-4 flex items-center justify-center shrink-0"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (hasChildren) onToggle(tag.fullPath)
-          }}
-        >
-          {hasChildren ? (
-            isExpanded ? (
-              <ChevronDown className="size-3 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="size-3 text-muted-foreground" />
-            )
-          ) : (
-            <span className="w-3" />
-          )}
-        </button>
-
         {/* Tag icon */}
         <Hash className="size-3.5 text-primary shrink-0" />
 
@@ -190,6 +171,23 @@ function TagItem({
         <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
           {tag.count}
         </span>
+
+        {/* Expand chevron - on the right */}
+        {hasChildren && (
+          <button
+            className="w-4 h-4 flex items-center justify-center shrink-0"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle(tag.fullPath)
+            }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="size-3 text-muted-foreground" />
+            ) : (
+              <ChevronLeft className="size-3 text-muted-foreground" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Children */}

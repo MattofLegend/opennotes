@@ -121,7 +121,7 @@ function ModeTabBar(): React.JSX.Element {
   const { rightPanelMode, setRightPanelMode } = useAppStore()
 
   return (
-    <div className="flex h-9 border-b border-border bg-sidebar shrink-0">
+    <div className="flex h-9 border-b border-border bg-sidebar shrink-0 app-drag-region">
       <button
         onClick={() => setRightPanelMode('chat')}
         className={cn(

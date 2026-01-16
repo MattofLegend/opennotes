@@ -99,7 +99,8 @@ export function NotesList(): React.JSX.Element {
     deleteNote,
     restoreNote,
     permanentDeleteNote,
-    toggleNoteFavorite
+    toggleNoteFavorite,
+    activeTab
   } = useAppStore()
 
   const filteredNotes = useMemo(() => filterNotes(notes, notesFilter), [notes, notesFilter])
@@ -110,6 +111,13 @@ export function NotesList(): React.JSX.Element {
   const getFullNotePath = (relativePath: string): string => {
     if (!notesPath) return relativePath
     return `${notesPath}/${relativePath}`
+  }
+
+  // Check if a note is currently selected (open in editor)
+  const isNoteSelected = (note: NoteInfo): boolean => {
+    if (activeTab === 'agent') return false
+    const fullPath = getFullNotePath(note.path)
+    return activeTab === fullPath
   }
 
   const handleCreateNote = async (): Promise<void> => {
@@ -123,17 +131,33 @@ export function NotesList(): React.JSX.Element {
     openFile(getFullNotePath(note.path), note.title)
   }
 
+  const handleDragStart = (e: React.DragEvent, note: NoteInfo): void => {
+    console.log('[NotesList] Drag start:', note.path)
+    // Set the data early in the event
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/x-note-path', note.path)
+    e.dataTransfer.setData('text/plain', note.title)
+    
+    // Create a custom drag image
+    const dragEl = document.createElement('div')
+    dragEl.textContent = note.title
+    dragEl.style.cssText = 'position: absolute; top: -1000px; padding: 8px 12px; background: var(--primary); color: var(--primary-foreground); border-radius: 4px; font-size: 12px; white-space: nowrap;'
+    document.body.appendChild(dragEl)
+    e.dataTransfer.setDragImage(dragEl, 0, 0)
+    setTimeout(() => document.body.removeChild(dragEl), 0)
+  }
+
   return (
     <div className="flex flex-col h-full bg-background border-r border-border">
-      {/* Header */}
+      {/* Header - matches right sidebar height (h-9 = 36px), draggable for window */}
       <div
-        className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0"
-        style={{ paddingTop: 'calc(12px + var(--sidebar-safe-padding, 0px))' }}
+        className="flex items-center justify-between px-3 h-9 border-b border-border shrink-0 app-drag-region"
+        style={{ marginTop: 'var(--sidebar-safe-padding, 0px)' }}
       >
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm font-medium truncate">{filterName}</span>
-          <span className="text-[10px] text-muted-foreground">
-            {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-section-header truncate">{filterName}</span>
+          <span className="text-[10px] text-muted-foreground tabular-nums">
+            {filteredNotes.length}
           </span>
         </div>
         {!isTrash && (
@@ -174,6 +198,7 @@ export function NotesList(): React.JSX.Element {
                 key={note.path}
                 note={note}
                 isTrash={isTrash}
+                isSelected={isNoteSelected(note)}
                 onOpen={handleOpenNote}
                 onDelete={deleteNote}
                 onRestore={restoreNote}
@@ -186,6 +211,7 @@ export function NotesList(): React.JSX.Element {
                     console.error('Failed to show in Finder:', e)
                   }
                 }}
+                onDragStart={handleDragStart}
               />
             ))
           )}
@@ -198,60 +224,78 @@ export function NotesList(): React.JSX.Element {
 interface NoteItemProps {
   note: NoteInfo
   isTrash: boolean
+  isSelected: boolean
   onOpen: (note: NoteInfo) => void
   onDelete: (path: string) => Promise<void>
   onRestore: (trashPath: string, targetFolder?: string) => Promise<void>
   onPermanentDelete: (trashPath: string) => Promise<void>
   onToggleFavorite: (path: string) => Promise<void>
   onShowInFinder: (path: string) => Promise<void>
+  onDragStart: (e: React.DragEvent, note: NoteInfo) => void
 }
 
 function NoteItem({
   note,
   isTrash,
+  isSelected,
   onOpen,
   onDelete,
   onRestore,
   onPermanentDelete,
   onToggleFavorite,
-  onShowInFinder
+  onShowInFinder,
+  onDragStart
 }: NoteItemProps): React.JSX.Element {
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          className={cn(
-            'group px-4 py-3 cursor-pointer transition-colors hover:bg-background-interactive border-b border-border/50'
-          )}
-          onClick={() => onOpen(note)}
-        >
-          <div className="flex items-start gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium truncate">{note.title}</span>
-                {note.isFavorite && !isTrash && (
-                  <Star className="size-3 text-status-warning fill-status-warning shrink-0" />
+    <div
+      draggable={!isTrash}
+      onDragStart={(e) => {
+        if (isTrash) {
+          e.preventDefault()
+          return
+        }
+        onDragStart(e, note)
+      }}
+    >
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className={cn(
+              'group px-4 py-3 cursor-pointer transition-colors border-b border-border/50',
+              isSelected
+                ? 'bg-primary/10 border-l-2 border-l-primary'
+                : 'hover:bg-background-interactive',
+              !isTrash && 'cursor-grab active:cursor-grabbing'
+            )}
+            onClick={() => onOpen(note)}
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium truncate">{note.title}</span>
+                  {note.isFavorite && !isTrash && (
+                    <Star className="size-3 text-status-warning fill-status-warning shrink-0" />
+                  )}
+                </div>
+                {note.preview && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                    {note.preview}
+                  </p>
                 )}
-              </div>
-              {note.preview && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {note.preview}
-                </p>
-              )}
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  {formatRelativeTime(note.modifiedAt)}
-                </span>
-                {note.folder && !isTrash && (
-                  <span className="text-[10px] text-muted-foreground truncate">
-                    • {note.folder}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatRelativeTime(note.modifiedAt)}
                   </span>
-                )}
+                  {note.folder && !isTrash && (
+                    <span className="text-[10px] text-muted-foreground truncate">
+                      • {note.folder}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </ContextMenuTrigger>
+        </ContextMenuTrigger>
       <ContextMenuContent>
         {isTrash ? (
           <>
@@ -291,5 +335,6 @@ function NoteItem({
         )}
       </ContextMenuContent>
     </ContextMenu>
+    </div>
   )
 }

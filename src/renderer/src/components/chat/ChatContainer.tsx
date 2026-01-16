@@ -486,7 +486,6 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/50 shrink-0">
         <ChatSelector />
         <div className="flex items-center gap-2">
-          <ModelSwitcher />
           <WorkspacePicker />
         </div>
       </div>
@@ -569,10 +568,13 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
       </ScrollArea>
 
       {/* Input */}
-      <div className="border-t border-border p-4">
+      <div className="border-t border-border px-4 pt-2 pb-4">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
           <div className="flex flex-col gap-2">
             <div className="flex items-end gap-2">
+              <div className="flex items-center justify-center shrink-0 h-12">
+                <ModelSwitcher />
+              </div>
               <textarea
                 ref={inputRef}
                 value={input}
@@ -580,19 +582,19 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
                 onKeyDown={handleKeyDown}
                 placeholder="Message..."
                 disabled={stream.isLoading}
-                className="flex-1 min-w-0 resize-none rounded-sm border border-border bg-background px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                className="flex-1 min-w-0 resize-none bg-transparent px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
                 rows={1}
                 style={{ minHeight: '48px', maxHeight: '200px' }}
               />
               <div className="flex items-center justify-center shrink-0 h-12">
                 {stream.isLoading ? (
-                  <Button type="button" variant="ghost" size="icon" onClick={handleCancel}>
+                  <button type="button" onClick={handleCancel} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
                     <Square className="size-4" />
-                  </Button>
+                  </button>
                 ) : (
-                  <Button type="submit" variant="default" size="icon" disabled={!input.trim()} className="rounded-md">
+                  <button type="submit" disabled={!input.trim()} className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors">
                     <Send className="size-4" />
-                  </Button>
+                  </button>
                 )}
               </div>
             </div>

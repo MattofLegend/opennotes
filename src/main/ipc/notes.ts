@@ -506,4 +506,124 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
     shell.showItemInFolder(notesDir)
     return true
   })
+
+  // Move a note to a new folder
+  ipcMain.handle(
+    'notes:move',
+    async (_event, { sourcePath, targetFolder }: { sourcePath: string; targetFolder: string }) => {
+      const sourceFullPath = join(notesDir, sourcePath)
+      if (!existsSync(sourceFullPath)) {
+        throw new Error('Note not found')
+      }
+
+      const filename = basename(sourcePath)
+      const targetDir = targetFolder ? join(notesDir, targetFolder) : notesDir
+
+      // Ensure target directory exists
+      if (!existsSync(targetDir)) {
+        mkdirSync(targetDir, { recursive: true })
+      }
+
+      // Handle filename conflicts
+      let finalFilename = filename
+      let targetPath = join(targetDir, finalFilename)
+      let counter = 2
+
+      while (existsSync(targetPath)) {
+        const ext = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : ''
+        const base = filename.includes('.') ? filename.slice(0, filename.lastIndexOf('.')) : filename
+        finalFilename = `${base} (${counter})${ext}`
+        targetPath = join(targetDir, finalFilename)
+        counter++
+      }
+
+      // Get old relative path for favorite handling
+      const oldRelativePath = sourcePath
+      const newRelativePath = relative(notesDir, targetPath)
+
+      // Update favorite if needed
+      if (isNoteFavorite(oldRelativePath)) {
+        renameNoteFavorite(oldRelativePath, newRelativePath)
+      }
+
+      // Move the file
+      renameSync(sourceFullPath, targetPath)
+
+      // Return updated note info
+      const content = readFileSync(targetPath, 'utf-8')
+      const stats = statSync(targetPath)
+      const folder = dirname(newRelativePath)
+
+      return {
+        path: newRelativePath,
+        title: extractTitle(content, finalFilename),
+        preview: extractPreview(content),
+        modifiedAt: stats.mtime.toISOString(),
+        isFavorite: isNoteFavorite(newRelativePath),
+        isDeleted: false,
+        folder: folder === '.' ? '' : folder,
+        tags: parseHashtags(content)
+      } as NoteInfo
+    }
+  )
+
+  // Move a folder to a new parent folder
+  ipcMain.handle(
+    'notes:moveFolder',
+    async (_event, { sourcePath, targetFolder }: { sourcePath: string; targetFolder: string }) => {
+      const sourceFullPath = join(notesDir, sourcePath)
+      if (!existsSync(sourceFullPath)) {
+        throw new Error('Folder not found')
+      }
+
+      const folderName = basename(sourcePath)
+      const targetDir = targetFolder ? join(notesDir, targetFolder) : notesDir
+
+      // Ensure target directory exists
+      if (!existsSync(targetDir)) {
+        mkdirSync(targetDir, { recursive: true })
+      }
+
+      // Handle name conflicts
+      let finalFolderName = folderName
+      let targetPath = join(targetDir, finalFolderName)
+      let counter = 2
+
+      while (existsSync(targetPath)) {
+        finalFolderName = `${folderName} (${counter})`
+        targetPath = join(targetDir, finalFolderName)
+        counter++
+      }
+
+      // Get all notes in the folder to update their favorites
+      const updateFavorites = (dir: string, oldBase: string, newBase: string): void => {
+        const entries = readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          const entryPath = join(dir, entry.name)
+          if (entry.isDirectory()) {
+            updateFavorites(entryPath, oldBase, newBase)
+          } else if (isNoteFile(entry.name)) {
+            const oldRelativePath = relative(notesDir, entryPath)
+            const newRelativePath = oldRelativePath.replace(oldBase, newBase)
+            if (isNoteFavorite(oldRelativePath)) {
+              renameNoteFavorite(oldRelativePath, newRelativePath)
+            }
+          }
+        }
+      }
+
+      const oldRelativePath = sourcePath
+      const newRelativePath = relative(notesDir, targetPath)
+      updateFavorites(sourceFullPath, oldRelativePath, newRelativePath)
+
+      // Move the folder
+      renameSync(sourceFullPath, targetPath)
+
+      return {
+        name: finalFolderName,
+        path: newRelativePath,
+        children: getAllFolders(targetPath, notesDir)
+      } as FolderNode
+    }
+  )
 }

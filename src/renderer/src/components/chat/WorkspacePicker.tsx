@@ -7,7 +7,6 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover'
 import { useAppStore } from '@/lib/store'
-import { cn } from '@/lib/utils'
 
 export async function selectWorkspaceFolder(
   currentThreadId: string | null,
@@ -16,15 +15,19 @@ export async function selectWorkspaceFolder(
   setLoading: (loading: boolean) => void,
   setOpen?: (open: boolean) => void
 ): Promise<void> {
-  if (!currentThreadId) return
   setLoading(true)
   try {
-    const path = await window.api.workspace.select(currentThreadId)
+    // workspace.select works with or without a thread ID
+    // If threadId is provided, it saves the path to the thread metadata
+    const path = await window.api.workspace.select(currentThreadId || undefined)
     if (path) {
       setWorkspacePath(path)
-      const result = await window.api.workspace.loadFromDisk(currentThreadId)
-      if (result.success && result.files) {
-        setWorkspaceFiles(result.files)
+      // Only load files if we have a thread ID
+      if (currentThreadId) {
+        const result = await window.api.workspace.loadFromDisk(currentThreadId)
+        if (result.success && result.files) {
+          setWorkspaceFiles(result.files)
+        }
       }
     }
     if (setOpen) setOpen(false)
@@ -68,22 +71,21 @@ export function WorkspacePicker(): React.JSX.Element {
 
   const folderName = workspacePath?.split('/').pop()
 
+  // Don't show the picker in the header until a workspace is selected
+  if (!workspacePath) {
+    return null
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
-          className={cn(
-            'h-7 px-2 text-xs gap-1.5',
-            workspacePath ? 'text-foreground' : 'text-amber-500'
-          )}
-          disabled={!currentThreadId}
+          className="h-7 px-2 text-xs gap-1.5 text-foreground"
         >
           <Folder className="size-3.5" />
-          <span className="max-w-[120px] truncate">
-            {workspacePath ? folderName : 'Select workspace'}
-          </span>
+          <span className="max-w-[120px] truncate">{folderName}</span>
           <ChevronDown className="size-3 opacity-50" />
         </Button>
       </PopoverTrigger>

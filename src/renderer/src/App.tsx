@@ -16,9 +16,9 @@ const NOTES_LIST_MIN = 200
 const NOTES_LIST_MAX = 400
 const NOTES_LIST_DEFAULT = 280
 
-const RIGHT_MIN = 250
-const RIGHT_MAX = 450
-const RIGHT_DEFAULT = 320
+const RIGHT_MIN = 300
+const RIGHT_MAX = 700
+const RIGHT_DEFAULT = 400
 
 function App(): React.JSX.Element {
   const { currentThreadId, loadThreads, createThread, loadProjects } = useAppStore()
@@ -140,24 +140,8 @@ function App(): React.JSX.Element {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Fixed app badge - zoom independent position and size */}
-      <div
-        className="app-badge"
-        style={{
-          // Compensate both position and scale for zoom
-          // Target screen position: top 14px, left 82px (just past traffic lights)
-          top: `${14 / zoomLevel}px`,
-          left: `${82 / zoomLevel}px`,
-          transform: `scale(${1 / zoomLevel})`,
-          transformOrigin: 'top left'
-        }}
-      >
-        <span className="app-badge-name">OPENNOTES</span>
-        <span className="app-badge-version">{__APP_VERSION__}</span>
-      </div>
-
       {/* Left Sidebar - Full height */}
-      <div style={{ width: leftWidth }} className="shrink-0 flex flex-col h-full">
+      <div style={{ width: leftWidth }} className="shrink-0 flex flex-col h-full border-r border-border">
         {/* Titlebar spacer for traffic lights + badge */}
         <div className="h-9 shrink-0 app-drag-region bg-sidebar" />
         <NotesSidebar />

@@ -234,28 +234,37 @@ export function registerAgentHandlers(ipcMain: IpcMain): void {
           recursionLimit: 1000
         }
 
-        if (decision.type === 'approve') {
-          // Resume execution by invoking with null (continues from checkpoint)
-          const stream = await agent.stream(null, config)
-
-          for await (const chunk of stream) {
-            if (abortController.signal.aborted) break
-
-            const [mode, data] = chunk as unknown as [string, unknown]
-            window.webContents.send(channel, {
-              type: 'stream',
-              mode,
-              data: JSON.parse(JSON.stringify(data))
-            })
-          }
-
-          window.webContents.send(channel, { type: 'done' })
-        } else if (decision.type === 'reject') {
-          // For reject, we need to send a Command with reject decision
-          // For now, just send done - the agent will see no resumption happened
-          window.webContents.send(channel, { type: 'done' })
+        // Resume with Command containing the HITL decision
+        // The humanInTheLoopMiddleware expects { decisions: [{ type, toolCallId, args? }] }
+        const resumeDecision: { type: string; toolCallId?: string; args?: Record<string, unknown> } = {
+          type: decision.type
         }
-        // edit case handled similarly to approve with modified args
+
+        // For reject/edit, include the tool call ID
+        if (decision.tool_call_id) {
+          resumeDecision.toolCallId = decision.tool_call_id
+        }
+
+        // For edit, include the modified args
+        if (decision.type === 'edit' && decision.edited_args) {
+          resumeDecision.args = decision.edited_args
+        }
+
+        const resumeValue = { decisions: [resumeDecision] }
+        const stream = await agent.stream(new Command({ resume: resumeValue }), config)
+
+        for await (const chunk of stream) {
+          if (abortController.signal.aborted) break
+
+          const [mode, data] = chunk as unknown as [string, unknown]
+          window.webContents.send(channel, {
+            type: 'stream',
+            mode,
+            data: JSON.parse(JSON.stringify(data))
+          })
+        }
+
+        window.webContents.send(channel, { type: 'done' })
       } catch (error) {
         console.error('[Agent] Interrupt error:', error)
         window.webContents.send(channel, {

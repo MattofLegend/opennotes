@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { Loader2, AlertCircle, FileText, Save } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { Loader2, AlertCircle, FileText, Save, Check, X, GitCompare } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
-import { MilkdownEditor } from '@/components/editor'
+import { MilkdownEditor, DiffViewer, FullFileDiffViewer } from '@/components/editor'
+import { Button } from '@/components/ui/button'
 
 const DEBOUNCE_DELAY = 1000
 
@@ -10,7 +11,7 @@ interface NoteViewerProps {
 }
 
 export function NoteViewer({ relativePath }: NoteViewerProps) {
-  const { updateNote, loadNotes } = useAppStore()
+  const { updateNote, loadNotes, pendingApproval, respondToApproval, notesPath } = useAppStore()
   const [content, setContent] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -19,6 +20,61 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
   const [savedContent, setSavedContent] = useState<string | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const contentRef = useRef<string | null>(null)
+
+  // Check if there's a pending approval for this file
+  const pendingEdit = useMemo(() => {
+    if (!pendingApproval || !notesPath) return null
+
+    const toolName = pendingApproval.tool_call.name
+    const args = pendingApproval.tool_call.args as Record<string, string>
+
+    if (toolName !== 'edit_file' && toolName !== 'write_file') return null
+
+    // Get the file path from the tool args
+    const filePath = args.path || args.file_path || ''
+    
+    // Build the full path for this note
+    const fullNotePath = `${notesPath}/${relativePath}`
+
+    // Check if this approval is for the current file
+    if (filePath !== fullNotePath && !filePath.endsWith(relativePath)) return null
+
+    if (toolName === 'edit_file') {
+      return {
+        type: 'edit' as const,
+        oldString: args.old_string || '',
+        newString: args.new_string || ''
+      }
+    } else {
+      return {
+        type: 'write' as const,
+        newContent: args.content || ''
+      }
+    }
+  }, [pendingApproval, notesPath, relativePath])
+
+  const handleApprove = useCallback(async () => {
+    // Optimistically update the content based on what we know will be written
+    if (pendingEdit && content) {
+      let newContent: string
+      if (pendingEdit.type === 'edit') {
+        // Apply the edit to current content
+        newContent = content.replace(pendingEdit.oldString, pendingEdit.newString)
+      } else {
+        // Full file replacement
+        newContent = pendingEdit.newContent
+      }
+      setContent(newContent)
+      setSavedContent(newContent)
+      contentRef.current = newContent
+    }
+    
+    await respondToApproval('approve')
+  }, [respondToApproval, pendingEdit, content])
+
+  const handleReject = useCallback(async () => {
+    await respondToApproval('reject')
+  }, [respondToApproval])
 
   useEffect(() => {
     contentRef.current = content
@@ -152,9 +208,59 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
 
   const lineCount = content.split('\n').length
 
+  // Show diff view if there's a pending edit for this file
+  if (pendingEdit) {
+    return (
+      <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+        {/* Header with approval status - same height as normal header */}
+        <div className="flex items-center gap-2 px-4 h-9 border-b border-status-warning/30 bg-status-warning/5 text-xs shrink-0">
+          <GitCompare className="size-3.5 text-status-warning" />
+          <span className="text-status-warning font-medium">Pending Changes</span>
+          <span className="text-muted-foreground/50">•</span>
+          <span className="text-muted-foreground truncate">{relativePath}</span>
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={handleReject}
+          >
+            <X className="size-3 mr-1" />
+            Reject
+          </Button>
+          <Button
+            variant="nominal"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={handleApprove}
+          >
+            <Check className="size-3 mr-1" />
+            Apply
+          </Button>
+        </div>
+
+        {/* Diff view */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          {pendingEdit.type === 'edit' ? (
+            <DiffViewer
+              originalContent={content}
+              oldString={pendingEdit.oldString}
+              newString={pendingEdit.newString}
+            />
+          ) : (
+            <FullFileDiffViewer
+              originalContent={content}
+              newContent={pendingEdit.newContent}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-background/50 text-xs text-muted-foreground shrink-0">
+      <div className="flex items-center gap-2 px-4 h-9 border-b border-border bg-background/50 text-xs text-muted-foreground shrink-0">
         <FileText className="size-3.5" />
         <span className="truncate">{relativePath}</span>
         <span className="text-muted-foreground/50">•</span>

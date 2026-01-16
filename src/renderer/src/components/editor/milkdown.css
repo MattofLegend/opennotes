@@ -215,3 +215,50 @@
   height: 0;
   pointer-events: none;
 }
+
+/* Compact styles for diff view */
+.diff-milkdown.milkdown-wrapper .milkdown {
+  padding: 0.25rem 0;
+}
+
+.diff-milkdown.milkdown-wrapper .milkdown-editor {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.diff-milkdown.milkdown-wrapper .milkdown-editor > * + * {
+  margin-top: 0.5em;
+}
+
+.diff-milkdown.milkdown-wrapper .milkdown-editor h1,
+.diff-milkdown.milkdown-wrapper .milkdown-editor h2,
+.diff-milkdown.milkdown-wrapper .milkdown-editor h3,
+.diff-milkdown.milkdown-wrapper .milkdown-editor h4,
+.diff-milkdown.milkdown-wrapper .milkdown-editor h5,
+.diff-milkdown.milkdown-wrapper .milkdown-editor h6 {
+  margin-top: 0.5em;
+  margin-bottom: 0.25em;
+}
+
+.diff-milkdown.milkdown-wrapper .milkdown-editor pre {
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.diff-milkdown.milkdown-wrapper .milkdown-editor ul,
+.diff-milkdown.milkdown-wrapper .milkdown-editor ol {
+  margin: 0.25rem 0;
+}
+
+.diff-milkdown.milkdown-wrapper .milkdown-editor li {
+  margin: 0.125rem 0;
+}
+
+.diff-milkdown.milkdown-wrapper .milkdown-editor hr {
+  margin: 0.75rem 0;
+}
+
+/* Hide placeholder in readonly diff view */
+.diff-milkdown.milkdown-wrapper .milkdown-editor p.is-editor-empty:first-child::before {
+  content: none;
+}

@@ -1,4 +1,3 @@
-import { User, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Message, HITLRequest } from '@/types'
 import { ToolCallRenderer } from './ToolCallRenderer'
@@ -24,16 +23,6 @@ export function MessageBubble({ message, isStreaming, toolResults, pendingApprov
   // Hide tool result messages - they're shown inline with tool calls
   if (isTool) {
     return null
-  }
-
-  const getIcon = () => {
-    if (isUser) return <User className="size-4" />
-    return <Bot className="size-4" />
-  }
-
-  const getLabel = () => {
-    if (isUser) return 'YOU'
-    return 'AGENT'
   }
 
   const renderContent = () => {
@@ -90,64 +79,40 @@ export function MessageBubble({ message, isStreaming, toolResults, pendingApprov
   }
 
   return (
-    <div className="flex gap-3 overflow-hidden">
-      {/* Left avatar column - shows for agent/tool */}
-      <div className="w-8 shrink-0">
-        {!isUser && (
-          <div className="flex size-8 items-center justify-center rounded-sm bg-status-info/10 text-status-info">
-            {getIcon()}
-          </div>
-        )}
-      </div>
-
-      {/* Content column - always same width */}
-      <div className="flex-1 min-w-0 space-y-2 overflow-hidden">
-        <div className={cn(
-          "text-section-header",
-          isUser && "text-right"
-        )}>
-          {getLabel()}
-        </div>
-
-        {content && (
-          <div className={cn(
-            "rounded-sm p-3 overflow-hidden",
-            isUser ? "bg-primary/10" : "bg-card"
-          )}>
+    <div className="space-y-2 overflow-hidden">
+      {/* Content */}
+      {content && (
+        isUser ? (
+          <div className="rounded-sm p-3 overflow-hidden bg-primary/10">
             {content}
           </div>
-        )}
-
-        {/* Tool calls */}
-        {hasToolCalls && (
-          <div className="space-y-2 overflow-hidden">
-            {message.tool_calls!.map((toolCall, index) => {
-              const result = toolResults?.get(toolCall.id)
-              const pendingId = pendingApproval?.tool_call?.id
-              const needsApproval = Boolean(pendingId && pendingId === toolCall.id)
-              return (
-                <ToolCallRenderer
-                  key={`${toolCall.id || `tc-${index}`}-${needsApproval ? 'pending' : 'done'}`}
-                  toolCall={toolCall}
-                  result={result?.content}
-                  isError={result?.is_error}
-                  needsApproval={needsApproval}
-                  onApprovalDecision={needsApproval ? onApprovalDecision : undefined}
-                />
-              )
-            })}
+        ) : (
+          <div className="overflow-hidden">
+            {content}
           </div>
-        )}
-      </div>
+        )
+      )}
 
-      {/* Right avatar column - shows for user */}
-      <div className="w-8 shrink-0">
-        {isUser && (
-          <div className="flex size-8 items-center justify-center rounded-sm bg-primary/10 text-primary">
-            {getIcon()}
-          </div>
-        )}
-      </div>
+      {/* Tool calls */}
+      {hasToolCalls && (
+        <div className="space-y-2 overflow-hidden">
+          {message.tool_calls!.map((toolCall, index) => {
+            const result = toolResults?.get(toolCall.id)
+            const pendingId = pendingApproval?.tool_call?.id
+            const needsApproval = Boolean(pendingId && pendingId === toolCall.id)
+            return (
+              <ToolCallRenderer
+                key={`${toolCall.id || `tc-${index}`}-${needsApproval ? 'pending' : 'done'}`}
+                toolCall={toolCall}
+                result={result?.content}
+                isError={result?.is_error}
+                needsApproval={needsApproval}
+                onApprovalDecision={needsApproval ? onApprovalDecision : undefined}
+              />
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

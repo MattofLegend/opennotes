@@ -209,7 +209,7 @@ export function registerModelHandlers(ipcMain: IpcMain): void {
     store.set('defaultModel', modelId)
   })
 
-  // Set API key for a provider (stored in ~/.openwork/.env)
+  // Set API key for a provider (stored in ~/.opennotes/.env)
   ipcMain.handle(
     'models:setApiKey',
     async (_event, { provider, apiKey }: { provider: string; apiKey: string }) => {
@@ -217,7 +217,7 @@ export function registerModelHandlers(ipcMain: IpcMain): void {
     }
   )
 
-  // Get API key for a provider (from ~/.openwork/.env or process.env)
+  // Get API key for a provider (from ~/.opennotes/.env or process.env)
   ipcMain.handle('models:getApiKey', async (_event, provider: string) => {
     return getApiKey(provider) ?? null
   })

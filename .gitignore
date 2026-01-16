@@ -5,3 +5,7 @@ out
 .eslintcache
 *.log*
 release
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc

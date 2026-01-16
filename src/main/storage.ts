@@ -2,7 +2,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 
-const OPENWORK_DIR = join(homedir(), '.openwork')
+const OPENWORK_DIR = join(homedir(), '.opennotes')
 const ENV_FILE = join(OPENWORK_DIR, '.env')
 
 // Environment variable names for each provider
@@ -20,7 +20,7 @@ export function getOpenworkDir(): string {
 }
 
 export function getDbPath(): string {
-  return join(getOpenworkDir(), 'openwork.sqlite')
+  return join(getOpenworkDir(), 'opennotes.sqlite')
 }
 
 export function getCheckpointDbPath(): string {

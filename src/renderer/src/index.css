@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -59,55 +60,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-}
-
-:root {
-  /* Foundation */
-  --radius: 3px;
-  --background: #0D0D0F;
-  --background-elevated: #141418;
-  --background-interactive: #1C1C22;
-  --foreground: #E8E8EC;
-
-  /* Borders */
-  --border: #2A2A32;
-  --border-emphasis: #3A3A45;
-  --input: #2A2A32;
-  --ring: #3B82F6;
-
-  /* Text hierarchy */
-  --muted: #141418;
-  --muted-foreground: #8A8A96;
-  --tertiary-foreground: #5A5A66;
-
-  /* Semantic mapping for shadcn compatibility */
-  --card: #141418;
-  --card-foreground: #E8E8EC;
-  --popover: #141418;
-  --popover-foreground: #E8E8EC;
-  --primary: #3B82F6;
-  --primary-foreground: #E8E8EC;
-  --secondary: #1C1C22;
-  --secondary-foreground: #E8E8EC;
-  --accent: #FB923C;
-  --accent-foreground: #0D0D0F;
-  --destructive: #E53E3E;
-
-  /* Status colors */
-  --status-critical: #E53E3E;
-  --status-warning: #F59E0B;
-  --status-nominal: #22C55E;
-  --status-info: #3B82F6;
-
-  /* Sidebar */
-  --sidebar: #141418;
-  --sidebar-foreground: #E8E8EC;
-  --sidebar-primary: #3B82F6;
-  --sidebar-primary-foreground: #E8E8EC;
-  --sidebar-accent: #1C1C22;
-  --sidebar-accent-foreground: #E8E8EC;
-  --sidebar-border: #2A2A32;
-  --sidebar-ring: #3B82F6;
 }
 
 @layer base {
@@ -353,11 +305,6 @@
 .app-drag-region select,
 .app-drag-region a {
   -webkit-app-region: no-drag;
-}
-
-/* Traffic light safe area for macOS - dynamically updated via JS */
-:root {
-  --sidebar-safe-padding: 0px;
 }
 
 /* App badge that stays fixed size regardless of zoom (position/scale set via JS) */

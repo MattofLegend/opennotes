@@ -3,6 +3,7 @@ import { join } from 'path'
 import { registerAgentHandlers } from './ipc/agent'
 import { registerThreadHandlers } from './ipc/threads'
 import { registerModelHandlers } from './ipc/models'
+import { registerNotesHandlers } from './ipc/notes'
 import { initializeDatabase } from './db'
 
 let mainWindow: BrowserWindow | null = null
@@ -85,6 +86,7 @@ app.whenReady().then(async () => {
   registerAgentHandlers(ipcMain)
   registerThreadHandlers(ipcMain)
   registerModelHandlers(ipcMain)
+  registerNotesHandlers(ipcMain)
 
   createWindow()
 

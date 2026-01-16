@@ -41,6 +41,10 @@ export default defineConfig({
   },
   preload: {},
   renderer: {
+    server: {
+      port: 5199,
+      strictPort: true // Fail if port is in use rather than taking over
+    },
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useLayoutEffect } from 'react'
-import { ThreadSidebar } from '@/components/sidebar/ThreadSidebar'
+import { NotesSidebar } from '@/components/sidebar/NotesSidebar'
+import { NotesList } from '@/components/notes/NotesList'
 import { TabbedPanel, TabBar } from '@/components/tabs'
 import { RightPanel } from '@/components/panels/RightPanel'
 import { ResizeHandle } from '@/components/ui/resizable'
@@ -10,6 +11,11 @@ const BADGE_MIN_SCREEN_WIDTH = 235
 const LEFT_MAX = 350
 const LEFT_DEFAULT = 240
 
+// Notes list panel dimensions
+const NOTES_LIST_MIN = 200
+const NOTES_LIST_MAX = 400
+const NOTES_LIST_DEFAULT = 280
+
 const RIGHT_MIN = 250
 const RIGHT_MAX = 450
 const RIGHT_DEFAULT = 320
@@ -18,11 +24,12 @@ function App(): React.JSX.Element {
   const { currentThreadId, loadThreads, createThread } = useAppStore()
   const [isLoading, setIsLoading] = useState(true)
   const [leftWidth, setLeftWidth] = useState(LEFT_DEFAULT)
+  const [notesListWidth, setNotesListWidth] = useState(NOTES_LIST_DEFAULT)
   const [rightWidth, setRightWidth] = useState(RIGHT_DEFAULT)
   const [zoomLevel, setZoomLevel] = useState(1)
 
   // Track drag start widths
-  const dragStartWidths = useRef<{ left: number; right: number } | null>(null)
+  const dragStartWidths = useRef<{ left: number; notesList: number; right: number } | null>(null)
 
   // Track zoom level changes and update CSS custom properties for safe areas
   useLayoutEffect(() => {
@@ -63,23 +70,34 @@ function App(): React.JSX.Element {
   const handleLeftResize = useCallback(
     (totalDelta: number) => {
       if (!dragStartWidths.current) {
-        dragStartWidths.current = { left: leftWidth, right: rightWidth }
+        dragStartWidths.current = { left: leftWidth, notesList: notesListWidth, right: rightWidth }
       }
       const newWidth = dragStartWidths.current.left + totalDelta
       setLeftWidth(Math.min(LEFT_MAX, Math.max(leftMinWidth, newWidth)))
     },
-    [leftWidth, rightWidth, leftMinWidth]
+    [leftWidth, notesListWidth, rightWidth, leftMinWidth]
+  )
+
+  const handleNotesListResize = useCallback(
+    (totalDelta: number) => {
+      if (!dragStartWidths.current) {
+        dragStartWidths.current = { left: leftWidth, notesList: notesListWidth, right: rightWidth }
+      }
+      const newWidth = dragStartWidths.current.notesList + totalDelta
+      setNotesListWidth(Math.min(NOTES_LIST_MAX, Math.max(NOTES_LIST_MIN, newWidth)))
+    },
+    [leftWidth, notesListWidth, rightWidth]
   )
 
   const handleRightResize = useCallback(
     (totalDelta: number) => {
       if (!dragStartWidths.current) {
-        dragStartWidths.current = { left: leftWidth, right: rightWidth }
+        dragStartWidths.current = { left: leftWidth, notesList: notesListWidth, right: rightWidth }
       }
       const newWidth = dragStartWidths.current.right - totalDelta
       setRightWidth(Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, newWidth)))
     },
-    [leftWidth, rightWidth]
+    [leftWidth, notesListWidth, rightWidth]
   )
 
   // Reset drag start on mouse up
@@ -145,6 +163,12 @@ function App(): React.JSX.Element {
           {/* Resize handle spacer */}
           <div className="w-[1px] shrink-0" />
 
+          {/* Notes list spacer */}
+          <div style={{ width: notesListWidth }} className="shrink-0" />
+
+          {/* Resize handle spacer */}
+          <div className="w-[1px] shrink-0" />
+
           {/* Center section - Tab bar */}
           <div className="flex-1 min-w-0">
             {currentThreadId && <TabBar className="h-full border-b-0" />}
@@ -153,12 +177,19 @@ function App(): React.JSX.Element {
 
         {/* Main content area */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Sidebar - Thread List */}
+          {/* Left Sidebar - Smart Views, Threads, Folders, Tags */}
           <div style={{ width: leftWidth }} className="shrink-0">
-            <ThreadSidebar />
+            <NotesSidebar />
           </div>
 
           <ResizeHandle onDrag={handleLeftResize} />
+
+          {/* Notes List Panel */}
+          <div style={{ width: notesListWidth }} className="shrink-0">
+            <NotesList />
+          </div>
+
+          <ResizeHandle onDrag={handleNotesListResize} />
 
           {/* Center - Content Panel (Agent Chat + File Viewer) */}
           <main className="flex flex-1 flex-col min-w-0 overflow-hidden">

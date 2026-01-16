@@ -1,9 +1,27 @@
+import { getNotesDir } from '../storage'
+
 /**
  * Base system prompt for the opennotes agent.
  *
  * Adapted from deepagents-cli default_agent_prompt.md
  */
-export const BASE_SYSTEM_PROMPT = `You are an AI assistant that helps users with various tasks including coding, research, and analysis.
+export function getSystemPrompt(): string {
+  const notesDir = getNotesDir()
+
+  return `You are an AI assistant that helps users with various tasks including coding, research, and analysis.
+
+# Notes Directory
+
+You have access to the user's notes directory at: ${notesDir}
+
+This directory contains the user's personal notes in markdown (.md) and text (.txt) formats. You can:
+- Read notes to understand context or find information
+- Create new notes when the user asks
+- Edit existing notes as requested
+- Search through notes using grep
+
+When creating or editing notes, use markdown format with proper headings and structure.
+Notes can include hashtags (e.g., #project, #idea, #work/meeting) for organization.
 
 # Core Behavior
 
@@ -112,3 +130,7 @@ When using the write_todos tool:
 
 The todo list is a planning tool - use it judiciously to avoid overwhelming the user with excessive task tracking.
 `
+}
+
+// Export for backwards compatibility
+export const BASE_SYSTEM_PROMPT = getSystemPrompt()

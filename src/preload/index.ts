@@ -202,6 +202,121 @@ const api = {
         ipcRenderer.removeListener('workspace:files-changed', handler)
       }
     }
+  },
+  notes: {
+    // List all notes with metadata
+    list: (): Promise<Array<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }>> => {
+      return ipcRenderer.invoke('notes:list')
+    },
+    // List only folders (for sidebar browser)
+    listFolders: (): Promise<Array<{
+      name: string
+      path: string
+      children: unknown[]
+    }>> => {
+      return ipcRenderer.invoke('notes:listFolders')
+    },
+    // Read a note's content
+    read: (path: string): Promise<string> => {
+      return ipcRenderer.invoke('notes:read', path)
+    },
+    // Create a new note
+    create: (params: { folder?: string; filename: string; content?: string }): Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }> => {
+      return ipcRenderer.invoke('notes:create', params)
+    },
+    // Create a new folder
+    createFolder: (params: { parentFolder?: string; name: string }): Promise<{
+      name: string
+      path: string
+      children: unknown[]
+    }> => {
+      return ipcRenderer.invoke('notes:createFolder', params)
+    },
+    // Update a note's content
+    update: (params: { path: string; content: string }): Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }> => {
+      return ipcRenderer.invoke('notes:update', params)
+    },
+    // Delete a note (move to trash)
+    delete: (path: string): Promise<boolean> => {
+      return ipcRenderer.invoke('notes:delete', path)
+    },
+    // Restore a note from trash
+    restore: (params: { trashPath: string; targetFolder?: string }): Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }> => {
+      return ipcRenderer.invoke('notes:restore', params)
+    },
+    // Permanently delete a note from trash
+    permanentDelete: (trashPath: string): Promise<boolean> => {
+      return ipcRenderer.invoke('notes:permanentDelete', trashPath)
+    },
+    // Toggle favorite status
+    toggleFavorite: (path: string): Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }> => {
+      return ipcRenderer.invoke('notes:toggleFavorite', path)
+    },
+    // Get all tags from notes
+    getTags: (): Promise<Array<{
+      name: string
+      fullPath: string
+      count: number
+      children: unknown[]
+    }>> => {
+      return ipcRenderer.invoke('notes:getTags')
+    },
+    // Delete a folder and all its contents
+    deleteFolder: (folderPath: string): Promise<boolean> => {
+      return ipcRenderer.invoke('notes:deleteFolder', folderPath)
+    },
+    // Get notes directory path
+    getPath: (): Promise<string> => {
+      return ipcRenderer.invoke('notes:getPath')
+    },
+    // Show a note or folder in Finder
+    showInFinder: (relativePath: string): Promise<boolean> => {
+      return ipcRenderer.invoke('notes:showInFinder', relativePath)
+    },
+    // Open the notes directory in Finder
+    openNotesFolder: (): Promise<boolean> => {
+      return ipcRenderer.invoke('notes:openNotesFolder')
+    }
   }
 }
 

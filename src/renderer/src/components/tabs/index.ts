@@ -1,5 +1,6 @@
 export { TabBar } from './TabBar'
 export { FileViewer } from './FileViewer'
+export { NoteViewer } from './NoteViewer'
 export { TabbedPanel } from './TabbedPanel'
 export { CodeViewer } from './CodeViewer'
 export { ImageViewer } from './ImageViewer'

@@ -131,3 +131,36 @@ export interface GrepMatch {
   line: number
   text: string
 }
+
+// Notes system types
+export interface NoteInfo {
+  path: string
+  title: string
+  preview: string
+  modifiedAt: string
+  isFavorite: boolean
+  isDeleted: boolean
+  folder: string
+  tags: string[]
+}
+
+export interface FolderNode {
+  name: string
+  path: string
+  children: FolderNode[]
+}
+
+export interface TagNode {
+  name: string
+  fullPath: string
+  count: number
+  children: TagNode[]
+}
+
+export type NotesFilterType = 'smart' | 'folder' | 'tag'
+export type SmartViewType = 'all' | 'recent' | 'favorites' | 'trash'
+
+export interface NotesFilter {
+  type: NotesFilterType
+  value: string // 'all' | 'recent' | 'favorites' | 'trash' for smart, folder path for folder, tag fullPath for tag
+}

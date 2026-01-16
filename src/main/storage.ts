@@ -27,6 +27,22 @@ export function getCheckpointDbPath(): string {
   return join(getOpennotesDir(), 'langgraph.sqlite')
 }
 
+export function getNotesDir(): string {
+  const notesDir = join(getOpennotesDir(), 'notes')
+  if (!existsSync(notesDir)) {
+    mkdirSync(notesDir, { recursive: true })
+  }
+  return notesDir
+}
+
+export function getNotesTrashDir(): string {
+  const trashDir = join(getNotesDir(), '.trash')
+  if (!existsSync(trashDir)) {
+    mkdirSync(trashDir, { recursive: true })
+  }
+  return trashDir
+}
+
 export function getEnvFilePath(): string {
   return ENV_FILE
 }

@@ -80,6 +80,76 @@ interface CustomAPI {
       callback: (data: { threadId: string; workspacePath: string }) => void
     ) => () => void
   }
+  notes: {
+    list: () => Promise<Array<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }>>
+    listFolders: () => Promise<Array<{
+      name: string
+      path: string
+      children: unknown[]
+    }>>
+    read: (path: string) => Promise<string>
+    create: (params: { folder?: string; filename: string; content?: string }) => Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }>
+    createFolder: (params: { parentFolder?: string; name: string }) => Promise<{
+      name: string
+      path: string
+      children: unknown[]
+    }>
+    update: (params: { path: string; content: string }) => Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }>
+    delete: (path: string) => Promise<boolean>
+    restore: (params: { trashPath: string; targetFolder?: string }) => Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }>
+    permanentDelete: (trashPath: string) => Promise<boolean>
+    toggleFavorite: (path: string) => Promise<{
+      path: string
+      title: string
+      preview: string
+      modifiedAt: string
+      isFavorite: boolean
+      isDeleted: boolean
+      folder: string
+    }>
+    getTags: () => Promise<Array<{
+      name: string
+      fullPath: string
+      count: number
+      children: unknown[]
+    }>>
+    deleteFolder: (folderPath: string) => Promise<boolean>
+    getPath: () => Promise<string>
+    showInFinder: (relativePath: string) => Promise<boolean>
+    openNotesFolder: () => Promise<boolean>
+  }
 }
 
 declare global {

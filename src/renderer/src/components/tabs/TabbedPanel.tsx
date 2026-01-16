@@ -2,6 +2,7 @@ import { FileCode } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { TabBar } from './TabBar'
 import { FileViewer } from './FileViewer'
+import { NoteViewer } from './NoteViewer'
 import { ChatContainer } from '@/components/chat/ChatContainer'
 
 interface TabbedPanelProps {
@@ -10,11 +11,16 @@ interface TabbedPanelProps {
 }
 
 export function TabbedPanel({ threadId, showTabBar = true }: TabbedPanelProps) {
-  const { activeTab, openFiles, rightPanelMode } = useAppStore()
+  const { activeTab, openFiles, rightPanelMode, notesPath } = useAppStore()
 
   const isAgentTab = activeTab === 'agent'
   const activeFile = openFiles.find((f) => f.path === activeTab)
   const chatInRightPanel = rightPanelMode === 'chat'
+
+  // Check if the active file is a note (path starts with notesPath)
+  const isNote = activeFile && notesPath && activeFile.path.startsWith(notesPath)
+  // Get relative path for notes (strip notesPath prefix)
+  const noteRelativePath = isNote ? activeFile.path.slice(notesPath.length + 1) : null
 
   const showChat = isAgentTab && !chatInRightPanel
   const showFile = activeFile !== undefined
@@ -32,8 +38,11 @@ export function TabbedPanel({ threadId, showTabBar = true }: TabbedPanelProps) {
       <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
         {showChat ? (
           <ChatContainer threadId={threadId} />
+        ) : showFile && isNote && noteRelativePath ? (
+          // Use NoteViewer for notes
+          <NoteViewer key={activeFile.path} relativePath={noteRelativePath} />
         ) : showFile ? (
-          // Use key to force remount when file changes, ensuring fresh state
+          // Use FileViewer for workspace files
           <FileViewer key={activeFile.path} filePath={activeFile.path} />
         ) : showEmptyState ? (
           <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground gap-3">

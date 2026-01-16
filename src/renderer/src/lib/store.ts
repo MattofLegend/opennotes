@@ -7,7 +7,11 @@ import type {
   Provider,
   HITLRequest,
   FileInfo,
-  Subagent
+  Subagent,
+  NoteInfo,
+  FolderNode,
+  TagNode,
+  NotesFilter
 } from '@/types'
 
 // Open file tab type
@@ -73,6 +77,13 @@ interface AppState {
   // Per-thread tab state persistence
   tabStateByThread: Record<string, TabState>
 
+  // Notes system state
+  notes: NoteInfo[]
+  folders: FolderNode[]
+  tags: TagNode[]
+  notesFilter: NotesFilter
+  notesPath: string | null
+
   // Actions
   loadThreads: () => Promise<void>
   createThread: (metadata?: Record<string, unknown>) => Promise<Thread>
@@ -132,6 +143,20 @@ interface AppState {
   closeFile: (path: string) => void
   setActiveTab: (tab: 'agent' | string) => void
   setFileContents: (path: string, content: string) => void
+
+  // Notes actions
+  loadNotes: () => Promise<void>
+  loadFolders: () => Promise<void>
+  loadTags: () => Promise<void>
+  setNotesFilter: (filter: NotesFilter) => void
+  createNote: (folder?: string, filename?: string) => Promise<NoteInfo>
+  createFolder: (parentFolder?: string, name?: string) => Promise<FolderNode>
+  deleteNote: (path: string) => Promise<void>
+  restoreNote: (trashPath: string, targetFolder?: string) => Promise<void>
+  permanentDeleteNote: (trashPath: string) => Promise<void>
+  toggleNoteFavorite: (path: string) => Promise<void>
+  updateNote: (path: string, content: string) => Promise<void>
+  deleteFolder: (folderPath: string) => Promise<void>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -157,6 +182,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTab: 'agent',
   fileContents: {},
   tabStateByThread: {},
+
+  // Notes system initial state
+  notes: [],
+  folders: [],
+  tags: [],
+  notesFilter: { type: 'smart', value: 'all' },
+  notesPath: null,
 
   // Thread actions
   loadThreads: async () => {
@@ -610,5 +642,104 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       fileContents: { ...state.fileContents, [path]: content }
     }))
+  },
+
+  // Notes actions
+  loadNotes: async () => {
+    try {
+      const notes = await window.api.notes.list()
+      const notesPath = await window.api.notes.getPath()
+      set({ notes, notesPath })
+    } catch (error) {
+      console.error('[Store] Failed to load notes:', error)
+    }
+  },
+
+  loadFolders: async () => {
+    try {
+      const folders = await window.api.notes.listFolders() as FolderNode[]
+      set({ folders })
+    } catch (error) {
+      console.error('[Store] Failed to load folders:', error)
+    }
+  },
+
+  loadTags: async () => {
+    try {
+      const tags = await window.api.notes.getTags() as TagNode[]
+      set({ tags })
+    } catch (error) {
+      console.error('[Store] Failed to load tags:', error)
+    }
+  },
+
+  setNotesFilter: (filter: NotesFilter) => {
+    set({ notesFilter: filter })
+  },
+
+  createNote: async (folder?: string, filename?: string) => {
+    // Use ISO date format to avoid slashes in filename
+    const dateStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    const finalFilename = filename || `Note ${dateStr}.md`
+    const note = await window.api.notes.create({ folder, filename: finalFilename })
+    // Reload notes and folders
+    await get().loadNotes()
+    await get().loadFolders()
+    await get().loadTags()
+    return note
+  },
+
+  createFolder: async (parentFolder?: string, name?: string) => {
+    const finalName = name || `New Folder ${Date.now()}`
+    const folder = await window.api.notes.createFolder({ parentFolder, name: finalName }) as FolderNode
+    // Reload folders
+    await get().loadFolders()
+    return folder
+  },
+
+  deleteNote: async (path: string) => {
+    await window.api.notes.delete(path)
+    // Reload notes
+    await get().loadNotes()
+    await get().loadTags()
+  },
+
+  restoreNote: async (trashPath: string, targetFolder?: string) => {
+    await window.api.notes.restore({ trashPath, targetFolder })
+    // Reload notes
+    await get().loadNotes()
+    await get().loadTags()
+  },
+
+  permanentDeleteNote: async (trashPath: string) => {
+    await window.api.notes.permanentDelete(trashPath)
+    // Reload notes
+    await get().loadNotes()
+  },
+
+  toggleNoteFavorite: async (path: string) => {
+    const updatedNote = await window.api.notes.toggleFavorite(path)
+    // Update the note in state
+    set((state) => ({
+      notes: state.notes.map((n) => (n.path === path ? updatedNote : n))
+    }))
+  },
+
+  updateNote: async (path: string, content: string) => {
+    const updatedNote = await window.api.notes.update({ path, content })
+    // Update the note in state
+    set((state) => ({
+      notes: state.notes.map((n) => (n.path === path ? updatedNote : n))
+    }))
+    // Reload tags in case they changed
+    await get().loadTags()
+  },
+
+  deleteFolder: async (folderPath: string) => {
+    await window.api.notes.deleteFolder(folderPath)
+    // Reload notes and folders
+    await get().loadNotes()
+    await get().loadFolders()
+    await get().loadTags()
   }
 }))

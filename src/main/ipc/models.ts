@@ -4,12 +4,12 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import type { ModelConfig, Provider } from '../types'
 import { startWatching, stopWatching } from '../services/workspace-watcher'
-import { getOpenworkDir, getApiKey, setApiKey, deleteApiKey, hasApiKey } from '../storage'
+import { getOpennotesDir, getApiKey, setApiKey, deleteApiKey, hasApiKey } from '../storage'
 
 // Store for non-sensitive settings only (no encryption needed)
 const store = new Store({
   name: 'settings',
-  cwd: getOpenworkDir()
+  cwd: getOpennotesDir()
 })
 
 // Provider configurations

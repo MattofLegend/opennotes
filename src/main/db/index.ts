@@ -131,6 +131,13 @@ export async function initializeDatabase(): Promise<SqlJsDatabase> {
   db.run(`CREATE INDEX IF NOT EXISTS idx_runs_thread_id ON runs(thread_id)`)
   db.run(`CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status)`)
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS note_favorites (
+      note_path TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL
+    )
+  `)
+
   saveToDisk()
 
   console.log('Database initialized successfully')
@@ -387,4 +394,60 @@ export function getThreadsByProject(projectId: string | null): Thread[] {
   stmt.free()
 
   return threads
+}
+
+export function isNoteFavorite(notePath: string): boolean {
+  const database = getDb()
+  const stmt = database.prepare('SELECT 1 FROM note_favorites WHERE note_path = ?')
+  stmt.bind([notePath])
+  const exists = stmt.step()
+  stmt.free()
+  return exists
+}
+
+export function setNoteFavorite(notePath: string, isFavorite: boolean): void {
+  const database = getDb()
+  
+  if (isFavorite) {
+    database.run(
+      'INSERT OR IGNORE INTO note_favorites (note_path, created_at) VALUES (?, ?)',
+      [notePath, Date.now()]
+    )
+  } else {
+    database.run('DELETE FROM note_favorites WHERE note_path = ?', [notePath])
+  }
+  
+  saveToDisk()
+}
+
+export function toggleNoteFavorite(notePath: string): boolean {
+  const currentlyFavorite = isNoteFavorite(notePath)
+  setNoteFavorite(notePath, !currentlyFavorite)
+  return !currentlyFavorite
+}
+
+export function getAllFavoriteNotePaths(): string[] {
+  const database = getDb()
+  const stmt = database.prepare('SELECT note_path FROM note_favorites ORDER BY created_at DESC')
+  const paths: string[] = []
+  
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as { note_path: string }
+    paths.push(row.note_path)
+  }
+  stmt.free()
+  
+  return paths
+}
+
+export function renameNoteFavorite(oldPath: string, newPath: string): void {
+  const database = getDb()
+  database.run('UPDATE note_favorites SET note_path = ? WHERE note_path = ?', [newPath, oldPath])
+  saveToDisk()
+}
+
+export function deleteNoteFavorite(notePath: string): void {
+  const database = getDb()
+  database.run('DELETE FROM note_favorites WHERE note_path = ?', [notePath])
+  saveToDisk()
 }

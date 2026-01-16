@@ -12,6 +12,12 @@ import {
   rmSync
 } from 'fs'
 import { getNotesDir, getNotesTrashDir } from '../storage'
+import {
+  isNoteFavorite,
+  toggleNoteFavorite,
+  deleteNoteFavorite,
+  renameNoteFavorite
+} from '../db'
 
 // Types
 interface NoteInfo {
@@ -38,62 +44,43 @@ interface TagNode {
   children: TagNode[]
 }
 
-// Helper: Check if file is a note
 function isNoteFile(filename: string): boolean {
   const ext = filename.toLowerCase()
   return ext.endsWith('.md') || ext.endsWith('.txt')
 }
 
-// Helper: Extract title from note content
 function extractTitle(content: string, filename: string): string {
   const lines = content.split('\n')
   for (const line of lines) {
     const trimmed = line.trim()
-    // Skip favorite marker
-    if (trimmed.startsWith('<!-- favorite -->')) continue
-    // Use first heading
     if (trimmed.startsWith('# ')) {
       return trimmed.slice(2).trim()
     }
-    // Use first non-empty line
     if (trimmed.length > 0) {
       return trimmed.slice(0, 60)
     }
   }
-  // Fall back to filename without extension
   return basename(filename, filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : '')
 }
 
-// Helper: Extract preview from note content
 function extractPreview(content: string): string {
   const lines = content.split('\n')
-  let preview = ''
   for (const line of lines) {
     const trimmed = line.trim()
-    // Skip favorite marker and headings
-    if (trimmed.startsWith('<!-- favorite -->')) continue
     if (trimmed.startsWith('#')) continue
     if (trimmed.length > 0) {
-      preview = trimmed.slice(0, 100)
-      break
+      return trimmed.slice(0, 100)
     }
   }
-  return preview
+  return ''
 }
 
-// Helper: Check if note is favorited
-function isFavorite(content: string): boolean {
-  return content.trim().startsWith('<!-- favorite -->')
-}
-
-// Helper: Parse hashtags from content
 function parseHashtags(content: string): string[] {
   const regex = /#[\w/-]+/g
   const matches = content.match(regex) || []
-  return [...new Set(matches.map((tag) => tag.slice(1)))] // Remove # prefix and dedupe
+  return [...new Set(matches.map((tag) => tag.slice(1)))]
 }
 
-// Helper: Recursively get all notes from a directory
 function getAllNotes(dir: string, notesRoot: string, trashDir: string): NoteInfo[] {
   const notes: NoteInfo[] = []
 
@@ -122,7 +109,7 @@ function getAllNotes(dir: string, notesRoot: string, trashDir: string): NoteInfo
         title: extractTitle(content, entry.name),
         preview: extractPreview(content),
         modifiedAt: stats.mtime.toISOString(),
-        isFavorite: isFavorite(content),
+        isFavorite: isNoteFavorite(relativePath),
         isDeleted: false,
         folder: folder === '.' ? '' : folder,
         tags: parseHashtags(content)
@@ -133,7 +120,6 @@ function getAllNotes(dir: string, notesRoot: string, trashDir: string): NoteInfo
   return notes
 }
 
-// Helper: Get notes from trash
 function getTrashNotes(trashDir: string): NoteInfo[] {
   const notes: NoteInfo[] = []
 
@@ -146,13 +132,14 @@ function getTrashNotes(trashDir: string): NoteInfo[] {
       const fullPath = join(trashDir, entry.name)
       const content = readFileSync(fullPath, 'utf-8')
       const stats = statSync(fullPath)
+      const relativePath = join('.trash', entry.name)
 
       notes.push({
-        path: join('.trash', entry.name),
+        path: relativePath,
         title: extractTitle(content, entry.name),
         preview: extractPreview(content),
         modifiedAt: stats.mtime.toISOString(),
-        isFavorite: isFavorite(content),
+        isFavorite: isNoteFavorite(relativePath),
         isDeleted: true,
         folder: '.trash',
         tags: parseHashtags(content)
@@ -163,7 +150,6 @@ function getTrashNotes(trashDir: string): NoteInfo[] {
   return notes
 }
 
-// Helper: Recursively get all folders (no files)
 function getAllFolders(dir: string, notesRoot: string): FolderNode[] {
   const folders: FolderNode[] = []
 
@@ -193,7 +179,6 @@ function getAllFolders(dir: string, notesRoot: string): FolderNode[] {
   return folders
 }
 
-// Helper: Build tag tree from flat tag list
 function buildTagTree(tags: string[]): TagNode[] {
   const tagCounts: Record<string, number> = {}
 
@@ -338,7 +323,7 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
       title: extractTitle(content, basename(relativePath)),
       preview: extractPreview(content),
       modifiedAt: stats.mtime.toISOString(),
-      isFavorite: isFavorite(content),
+      isFavorite: isNoteFavorite(relativePath),
       isDeleted: false,
       folder: folder === '.' ? '' : folder,
       tags: parseHashtags(content)
@@ -357,10 +342,17 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
 
     // If file with same name exists in trash, add timestamp
     let finalTrashPath = trashPath
+    let finalTrashRelativePath = join('.trash', filename)
     if (existsSync(trashPath)) {
       const ext = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : ''
       const base = filename.includes('.') ? filename.slice(0, filename.lastIndexOf('.')) : filename
-      finalTrashPath = join(trashDir, `${base}-${Date.now()}${ext}`)
+      const newFilename = `${base}-${Date.now()}${ext}`
+      finalTrashPath = join(trashDir, newFilename)
+      finalTrashRelativePath = join('.trash', newFilename)
+    }
+
+    if (isNoteFavorite(relativePath)) {
+      renameNoteFavorite(relativePath, finalTrashRelativePath)
     }
 
     renameSync(fullPath, finalTrashPath)
@@ -388,12 +380,16 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
     const relativePath = relative(notesDir, targetPath)
     const folder = dirname(relativePath)
 
+    if (isNoteFavorite(trashPath)) {
+      renameNoteFavorite(trashPath, relativePath)
+    }
+
     return {
       path: relativePath,
       title: extractTitle(content, filename),
       preview: extractPreview(content),
       modifiedAt: stats.mtime.toISOString(),
-      isFavorite: isFavorite(content),
+      isFavorite: isNoteFavorite(relativePath),
       isDeleted: false,
       folder: folder === '.' ? '' : folder,
       tags: parseHashtags(content)
@@ -407,6 +403,7 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
       throw new Error('Note not found in trash')
     }
 
+    deleteNoteFavorite(trashPath)
     unlinkSync(fullPath)
     return true
   })
@@ -418,19 +415,9 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
       throw new Error('Note not found')
     }
 
-    let content = readFileSync(fullPath, 'utf-8')
-    const favoriteMarker = '<!-- favorite -->\n'
+    const newFavoriteStatus = toggleNoteFavorite(relativePath)
 
-    if (isFavorite(content)) {
-      // Remove favorite marker
-      content = content.replace(favoriteMarker, '')
-    } else {
-      // Add favorite marker at the beginning
-      content = favoriteMarker + content
-    }
-
-    writeFileSync(fullPath, content)
-
+    const content = readFileSync(fullPath, 'utf-8')
     const stats = statSync(fullPath)
     const folder = dirname(relativePath)
 
@@ -439,7 +426,7 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
       title: extractTitle(content, basename(relativePath)),
       preview: extractPreview(content),
       modifiedAt: stats.mtime.toISOString(),
-      isFavorite: isFavorite(content),
+      isFavorite: newFavoriteStatus,
       isDeleted: false,
       folder: folder === '.' ? '' : folder,
       tags: parseHashtags(content)
@@ -475,12 +462,19 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
         if (entry.isDirectory()) {
           moveToTrash(entryPath)
         } else if (isNoteFile(entry.name)) {
+          const noteRelativePath = relative(notesDir, entryPath)
           const trashPath = join(trashDir, entry.name)
           let finalTrashPath = trashPath
+          let finalTrashRelativePath = join('.trash', entry.name)
           if (existsSync(trashPath)) {
             const ext = entry.name.includes('.') ? entry.name.slice(entry.name.lastIndexOf('.')) : ''
             const base = entry.name.includes('.') ? entry.name.slice(0, entry.name.lastIndexOf('.')) : entry.name
-            finalTrashPath = join(trashDir, `${base}-${Date.now()}${ext}`)
+            const newFilename = `${base}-${Date.now()}${ext}`
+            finalTrashPath = join(trashDir, newFilename)
+            finalTrashRelativePath = join('.trash', newFilename)
+          }
+          if (isNoteFavorite(noteRelativePath)) {
+            renameNoteFavorite(noteRelativePath, finalTrashRelativePath)
           }
           renameSync(entryPath, finalTrashPath)
         }

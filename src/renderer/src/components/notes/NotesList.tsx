@@ -13,6 +13,14 @@ import {
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
 
+function sortWithFavoritesFirst(notes: NoteInfo[]): NoteInfo[] {
+  return [...notes].sort((a, b) => {
+    if (a.isFavorite && !b.isFavorite) return -1
+    if (!a.isFavorite && b.isFavorite) return 1
+    return new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
+  })
+}
+
 // Filter notes based on current filter
 function filterNotes(notes: NoteInfo[], filter: { type: string; value: string }): NoteInfo[] {
   const now = new Date()
@@ -22,35 +30,37 @@ function filterNotes(notes: NoteInfo[], filter: { type: string; value: string })
     case 'smart':
       switch (filter.value) {
         case 'all':
-          return notes.filter((n) => !n.isDeleted)
+          return sortWithFavoritesFirst(notes.filter((n) => !n.isDeleted))
         case 'recent':
-          return notes
-            .filter((n) => !n.isDeleted && new Date(n.modifiedAt) >= sevenDaysAgo)
-            .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
+          return sortWithFavoritesFirst(
+            notes.filter((n) => !n.isDeleted && new Date(n.modifiedAt) >= sevenDaysAgo)
+          )
         case 'favorites':
-          return notes.filter((n) => !n.isDeleted && n.isFavorite)
+          return notes
+            .filter((n) => !n.isDeleted && n.isFavorite)
+            .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
         case 'trash':
           return notes.filter((n) => n.isDeleted)
         default:
-          return notes.filter((n) => !n.isDeleted)
+          return sortWithFavoritesFirst(notes.filter((n) => !n.isDeleted))
       }
     case 'folder':
-      // Show notes in this folder and all subfolders
-      // e.g., filter "project-x" matches notes in "project-x", "project-x/subfolder", etc.
-      return notes.filter((n) => {
-        if (n.isDeleted) return false
-        if (filter.value === '') return true // Empty = all folders
-        return n.folder === filter.value || n.folder.startsWith(filter.value + '/')
-      })
+      return sortWithFavoritesFirst(
+        notes.filter((n) => {
+          if (n.isDeleted) return false
+          if (filter.value === '') return true // Empty = all folders
+          return n.folder === filter.value || n.folder.startsWith(filter.value + '/')
+        })
+      )
     case 'tag':
-      // Filter notes that have this tag or a child tag
-      // e.g., filter "work" matches notes with #work, #work/meeting, etc.
-      return notes.filter((n) => {
-        if (n.isDeleted) return false
-        return n.tags.some((tag) => tag === filter.value || tag.startsWith(filter.value + '/'))
-      })
+      return sortWithFavoritesFirst(
+        notes.filter((n) => {
+          if (n.isDeleted) return false
+          return n.tags.some((tag) => tag === filter.value || tag.startsWith(filter.value + '/'))
+        })
+      )
     default:
-      return notes.filter((n) => !n.isDeleted)
+      return sortWithFavoritesFirst(notes.filter((n) => !n.isDeleted))
   }
 }
 

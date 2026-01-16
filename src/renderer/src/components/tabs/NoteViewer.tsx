@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Loader2, AlertCircle, FileText, Save } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { MilkdownEditor } from '@/components/editor'
+
+const DEBOUNCE_DELAY = 1000
 
 interface NoteViewerProps {
-  /** Relative path from notes directory */
   relativePath: string
 }
 
@@ -15,9 +16,14 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
   const [error, setError] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [savedContent, setSavedContent] = useState<string | null>(null)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const contentRef = useRef<string | null>(null)
 
-  // Load note content
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
+
   useEffect(() => {
     async function loadNote() {
       setIsLoading(true)
@@ -25,6 +31,8 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
       try {
         const noteContent = await window.api.notes.read(relativePath)
         setContent(noteContent)
+        setSavedContent(noteContent)
+        contentRef.current = noteContent
         setIsDirty(false)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to read note')
@@ -35,46 +43,82 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
     loadNote()
   }, [relativePath])
 
-  // Save note
-  const handleSave = useCallback(async () => {
-    if (!isDirty || content === null) return
+  const saveNote = useCallback(async () => {
+    const currentContent = contentRef.current
+    if (currentContent === null) return
 
     setIsSaving(true)
     try {
-      await updateNote(relativePath, content)
+      await updateNote(relativePath, currentContent)
+      setSavedContent(currentContent)
       setIsDirty(false)
-      // Refresh notes list to update title/preview
       loadNotes()
     } catch (e) {
       console.error('Failed to save note:', e)
     } finally {
       setIsSaving(false)
     }
-  }, [relativePath, content, isDirty, updateNote, loadNotes])
+  }, [relativePath, updateNote, loadNotes])
 
-  // Handle keyboard shortcuts
+  const debouncedSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveNote()
+    }, DEBOUNCE_DELAY)
+  }, [saveNote])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        if (contentRef.current !== null) {
+          updateNote(relativePath, contentRef.current).catch(console.error)
+        }
+      }
+    }
+  }, [relativePath, updateNote])
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
-        handleSave()
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current)
+        }
+        saveNote()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSave])
+  }, [saveNote])
 
-  // Auto-save on blur
-  const handleBlur = () => {
+  const handleBlur = useCallback(() => {
     if (isDirty) {
-      handleSave()
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+      saveNote()
     }
-  }
+  }, [isDirty, saveNote])
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value)
-    setIsDirty(true)
-  }
+  const handleChange = useCallback((newContent: string) => {
+    setContent(newContent)
+    const isChanged = newContent !== savedContent
+    setIsDirty(isChanged)
+    if (isChanged) {
+      debouncedSave()
+    }
+  }, [savedContent, debouncedSave])
 
   if (isLoading) {
     return (
@@ -106,12 +150,10 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
     )
   }
 
-  const fileName = relativePath.split('/').pop() || relativePath
   const lineCount = content.split('\n').length
 
   return (
     <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-      {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-background/50 text-xs text-muted-foreground shrink-0">
         <FileText className="size-3.5" />
         <span className="truncate">{relativePath}</span>
@@ -120,7 +162,7 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
         {isDirty && (
           <>
             <span className="text-muted-foreground/50">•</span>
-            <span className="text-accent-gold">Unsaved</span>
+            <span className="text-accent">Unsaved</span>
           </>
         )}
         {isSaving && (
@@ -132,18 +174,13 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
         )}
       </div>
 
-      {/* Editor */}
-      <ScrollArea className="flex-1 min-h-0">
-        <textarea
-          ref={textareaRef}
-          value={content}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <MilkdownEditor
+          content={content}
           onChange={handleChange}
           onBlur={handleBlur}
-          className="w-full h-full min-h-[calc(100vh-200px)] p-4 bg-transparent text-foreground text-sm font-mono leading-relaxed resize-none focus:outline-none"
-          placeholder="Start writing..."
-          spellCheck={false}
         />
-      </ScrollArea>
+      </div>
     </div>
   )
 }

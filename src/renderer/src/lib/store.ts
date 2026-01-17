@@ -68,6 +68,7 @@ interface AppState {
   // Right panel state
   rightPanelTab: 'todos' | 'files' | 'subagents'
   rightPanelMode: 'chat' | 'inspector'
+  chatExpanded: boolean // When true, chat is shown in main area as a tab
 
   // Settings dialog state
   settingsOpen: boolean
@@ -148,6 +149,7 @@ interface AppState {
   // Panel actions
   setRightPanelTab: (tab: 'todos' | 'files' | 'subagents') => void
   setRightPanelMode: (mode: 'chat' | 'inspector') => void
+  setChatExpanded: (expanded: boolean) => void
 
   // Settings actions
   setSettingsOpen: (open: boolean) => void
@@ -173,7 +175,7 @@ interface AppState {
   restoreNote: (trashPath: string, targetFolder?: string) => Promise<void>
   permanentDeleteNote: (trashPath: string) => Promise<void>
   toggleNoteFavorite: (path: string) => Promise<void>
-  updateNote: (path: string, content: string) => Promise<void>
+  updateNote: (path: string, content: string) => Promise<string>
   deleteFolder: (folderPath: string) => Promise<void>
   moveNote: (sourcePath: string, targetFolder: string) => Promise<void>
   moveFolder: (sourcePath: string, targetFolder: string) => Promise<void>
@@ -199,6 +201,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentModel: 'claude-sonnet-4-5-20250929',
   rightPanelTab: 'todos',
   rightPanelMode: 'chat',
+  chatExpanded: false,
   settingsOpen: false,
   sidebarCollapsed: false,
   openFiles: [],
@@ -278,13 +281,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       workspaceFiles: []
     })
 
-    // If selecting a project, set the notes filter to that project's folder
-    if (project) {
-      set({ notesFilter: { type: 'folder', value: project.notesFolder } })
-    } else {
-      // "All Projects" - show all notes
-      set({ notesFilter: { type: 'smart', value: 'all' } })
-    }
+    // Keep the current filter - projects act as scope/filter, not as selection
+    // The NotesList component will filter notes by project folder automatically
 
     // Reload threads for this project scope
     loadThreads()
@@ -713,6 +711,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ rightPanelMode: mode })
   },
 
+  setChatExpanded: (expanded: boolean) => {
+    set({ 
+      chatExpanded: expanded,
+      // When expanding chat, set activeTab to 'agent' so it shows immediately
+      ...(expanded ? { activeTab: 'agent' } : {})
+    })
+  },
+
   // Settings actions
   setSettingsOpen: (open: boolean) => {
     set({ settingsOpen: open })
@@ -863,13 +869,50 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateNote: async (path: string, content: string) => {
+    const state = get()
     const updatedNote = await window.api.notes.update({ path, content })
-    // Update the note in state
-    set((state) => ({
-      notes: state.notes.map((n) => (n.path === path ? updatedNote : n))
-    }))
+    const pathChanged = updatedNote.path !== path
+    
+    // Update the note in state (handle path change)
+    set((s) => {
+      const newState: Partial<AppState> = {
+        notes: s.notes.map((n) => (n.path === path ? updatedNote : n))
+      }
+      
+      // If path changed, update open files and file contents
+      if (pathChanged && s.notesPath) {
+        const oldFullPath = `${s.notesPath}/${path}`
+        const newFullPath = `${s.notesPath}/${updatedNote.path}`
+        
+        // Update open files
+        newState.openFiles = s.openFiles.map((f) => 
+          f.path === oldFullPath 
+            ? { ...f, path: newFullPath, name: updatedNote.title + '.md' }
+            : f
+        )
+        
+        // Update active tab if it was the renamed file
+        if (s.activeTab === oldFullPath) {
+          newState.activeTab = newFullPath
+        }
+        
+        // Update file contents cache
+        const newFileContents = { ...s.fileContents }
+        if (newFileContents[oldFullPath]) {
+          newFileContents[newFullPath] = newFileContents[oldFullPath]
+          delete newFileContents[oldFullPath]
+        }
+        newState.fileContents = newFileContents
+      }
+      
+      return newState
+    })
+    
     // Reload tags in case they changed
     await get().loadTags()
+    
+    // Return the new path so callers can update their references
+    return updatedNote.path
   },
 
   deleteFolder: async (folderPath: string) => {

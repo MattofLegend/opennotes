@@ -6,12 +6,65 @@ import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
 import { history } from '@milkdown/kit/plugin/history'
 import { clipboard } from '@milkdown/kit/plugin/clipboard'
 import { replaceAll } from '@milkdown/kit/utils'
+import { $prose } from '@milkdown/kit/utils'
+import { Plugin, PluginKey } from '@milkdown/kit/prose/state'
+import { Decoration, DecorationSet } from '@milkdown/kit/prose/view'
 import { cn } from '@/lib/utils'
+
+// Plugin to style wiki-links [[Title]]
+const wikiLinkDecorationKey = new PluginKey('wiki-link-decoration')
+
+const wikiLinkPlugin = $prose(() => {
+  return new Plugin({
+    key: wikiLinkDecorationKey,
+    state: {
+      init(_, state) {
+        return findWikiLinks(state.doc)
+      },
+      apply(tr, oldDecorations) {
+        if (tr.docChanged) {
+          return findWikiLinks(tr.doc)
+        }
+        return oldDecorations.map(tr.mapping, tr.doc)
+      }
+    },
+    props: {
+      decorations(state) {
+        return this.getState(state)
+      }
+    }
+  })
+})
+
+function findWikiLinks(doc: any): DecorationSet {
+  const decorations: Decoration[] = []
+  
+  doc.descendants((node: any, pos: number) => {
+    if (node.isText) {
+      const text = node.text || ''
+      const regex = /\[\[([^\]]+)\]\]/g
+      let match
+      while ((match = regex.exec(text)) !== null) {
+        const from = pos + match.index
+        const to = from + match[0].length
+        decorations.push(
+          Decoration.inline(from, to, {
+            class: 'wiki-link',
+            style: 'color: var(--primary); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent); cursor: pointer;'
+          })
+        )
+      }
+    }
+  })
+  
+  return DecorationSet.create(doc, decorations)
+}
 
 interface MilkdownEditorProps {
   content: string
   onChange: (content: string) => void
   onBlur?: () => void
+  onLinkClick?: (href: string) => void
 }
 
 interface MilkdownReadOnlyProps {
@@ -19,7 +72,7 @@ interface MilkdownReadOnlyProps {
   className?: string
 }
 
-export function MilkdownEditor({ content, onChange, onBlur }: MilkdownEditorProps) {
+export function MilkdownEditor({ content, onChange, onBlur, onLinkClick }: MilkdownEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<Editor | null>(null)
   const contentRef = useRef(content)
@@ -38,6 +91,57 @@ export function MilkdownEditor({ content, onChange, onBlur }: MilkdownEditorProp
     },
     [onChange]
   )
+
+  // Handle link clicks via event delegation on the container
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !onLinkClick) return
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      
+      // Check for regular <a> links
+      const link = target.closest('a')
+      if (link) {
+        const href = link.getAttribute('href')
+        if (href) {
+          e.preventDefault()
+          e.stopPropagation()
+          onLinkClick(href)
+          return
+        }
+      }
+      
+      // Check for wiki-style [[Title]] links in text
+      // Get the text content around the click
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        const textNode = range.startContainer
+        if (textNode.nodeType === Node.TEXT_NODE && textNode.textContent) {
+          const text = textNode.textContent
+          const offset = range.startOffset
+          
+          // Find [[...]] pattern around the cursor position
+          const wikiLinkRegex = /\[\[([^\]]+)\]\]/g
+          let match
+          while ((match = wikiLinkRegex.exec(text)) !== null) {
+            const start = match.index
+            const end = start + match[0].length
+            if (offset >= start && offset <= end) {
+              e.preventDefault()
+              e.stopPropagation()
+              onLinkClick(match[0]) // Pass the full [[Title]] pattern
+              return
+            }
+          }
+        }
+      }
+    }
+
+    container.addEventListener('click', handleClick, true) // Use capture phase
+    return () => container.removeEventListener('click', handleClick, true)
+  }, [onLinkClick])
 
   useEffect(() => {
     if (!containerRef.current || isInitializedRef.current) return
@@ -70,6 +174,7 @@ export function MilkdownEditor({ content, onChange, onBlur }: MilkdownEditorProp
         .use(listener)
         .use(history)
         .use(clipboard)
+        .use(wikiLinkPlugin)
         .create()
 
       editorRef.current = editor

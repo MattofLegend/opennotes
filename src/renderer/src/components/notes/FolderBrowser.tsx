@@ -205,8 +205,8 @@ function FolderItem({
               className={cn(
                 'group flex items-center gap-1.5 py-1 pr-2 cursor-pointer cursor-grab active:cursor-grabbing transition-colors text-sm',
                 isSelected
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'hover:bg-sidebar-accent/50'
+                  ? 'bg-primary/15 text-primary'
+                  : ''
               )}
               style={{ paddingLeft }}
               onClick={() => onSelect(folder.path)}

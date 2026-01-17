@@ -1,4 +1,4 @@
-import { Bot, X, FileCode, FileText, FileJson, File } from 'lucide-react'
+import { X, FileCode, FileText, FileJson, File, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore, type OpenFile } from '@/lib/store'
 
@@ -7,27 +7,49 @@ interface TabBarProps {
 }
 
 export function TabBar({ className }: TabBarProps) {
-  const { openFiles, activeTab, setActiveTab, closeFile, rightPanelMode } = useAppStore()
-  const showAgentTab = rightPanelMode === 'inspector'
+  const { openFiles, activeTab, setActiveTab, closeFile, chatExpanded, setChatExpanded } = useAppStore()
+
+  const handleCloseAgentTab = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setChatExpanded(false)
+  }
 
   return (
     <div className={cn(
-      "flex items-center h-9 border-b border-border bg-sidebar overflow-x-auto scrollbar-hide app-no-drag",
+      "flex items-center h-9 bg-sidebar overflow-x-auto scrollbar-hide app-drag-region",
       className
     )}>
-      {showAgentTab && (
-        <button
+      {/* Agent Tab - shown when chat is expanded */}
+      {chatExpanded && (
+        <div
+          role="tab"
+          tabIndex={0}
           onClick={() => setActiveTab('agent')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setActiveTab('agent')
+            }
+          }}
           className={cn(
-            "flex items-center gap-2 px-4 h-full text-sm font-medium transition-colors shrink-0 border-r border-border",
+            "group flex items-center gap-2 px-3 h-full text-sm transition-colors shrink-0 border-r border-border cursor-pointer app-no-drag",
             activeTab === 'agent'
-              ? "bg-primary/15 text-primary border-b-2 border-b-primary"
-              : "text-muted-foreground hover:text-foreground hover:bg-background-interactive"
+              ? "bg-primary/15 text-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-background-interactive border-b border-border"
           )}
         >
           <Bot className="size-4" />
           <span>Agent</span>
-        </button>
+          <button
+            onClick={handleCloseAgentTab}
+            className={cn(
+              "size-4 flex items-center justify-center rounded-sm hover:bg-background-interactive transition-colors",
+              activeTab === 'agent' ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}
+          >
+            <X className="size-3" />
+          </button>
+        </div>
       )}
 
       {/* File Tabs */}
@@ -42,7 +64,7 @@ export function TabBar({ className }: TabBarProps) {
       ))}
 
       {/* Spacer to fill remaining space */}
-      <div className="flex-1 min-w-0" />
+      <div className="flex-1 min-w-0 h-full border-b border-border" />
     </div>
   )
 }
@@ -81,10 +103,10 @@ function FileTab({ file, isActive, onSelect, onClose }: FileTabProps) {
         }
       }}
       className={cn(
-        "group flex items-center gap-2 px-3 h-full text-sm transition-colors shrink-0 border-r border-border max-w-[200px] cursor-pointer",
+        "group flex items-center gap-2 px-3 h-full text-sm transition-colors shrink-0 border-r border-border max-w-[200px] cursor-pointer app-no-drag",
         isActive
-          ? "bg-background text-foreground border-b-2 border-b-primary"
-          : "text-muted-foreground hover:text-foreground hover:bg-background-interactive"
+          ? "bg-background text-foreground"
+          : "text-muted-foreground hover:text-foreground hover:bg-background-interactive border-b border-border"
       )}
       title={file.path}
     >
@@ -115,9 +137,9 @@ function FileIcon({ name }: { name: string }) {
     case 'css':
     case 'scss':
     case 'html':
-      return <FileCode className="size-3.5 text-blue-400 shrink-0" />
+      return <FileCode className="size-3.5 text-primary shrink-0" />
     case 'json':
-      return <FileJson className="size-3.5 text-yellow-500 shrink-0" />
+      return <FileJson className="size-3.5 text-primary shrink-0" />
     case 'md':
     case 'mdx':
     case 'txt':

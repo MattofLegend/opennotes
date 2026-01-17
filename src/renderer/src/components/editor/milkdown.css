@@ -75,10 +75,12 @@
   text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent);
   text-underline-offset: 2px;
   transition: text-decoration-color 0.15s ease;
+  cursor: pointer;
 }
 
 .milkdown-wrapper .milkdown-editor a:hover {
   text-decoration-color: var(--primary);
+  cursor: pointer;
 }
 
 .milkdown-wrapper .milkdown-editor strong {

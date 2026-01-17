@@ -10,12 +10,13 @@ import {
   Trash,
   ChevronLeft,
   ChevronDown,
-  Layers
+  Layers,
+  CircleOff
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAppStore } from '@/lib/store'
-import { cn } from '@/lib/utils'
+import { cn, truncate } from '@/lib/utils'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -30,6 +31,7 @@ import type { SmartViewType } from '@/types'
 // Smart View configuration
 const SMART_VIEWS: { id: SmartViewType; label: string; icon: React.ElementType }[] = [
   { id: 'all', label: 'All Notes', icon: FileText },
+  { id: 'untagged', label: 'Untagged', icon: CircleOff },
   { id: 'recent', label: 'Recent', icon: Clock },
   { id: 'favorites', label: 'Favorites', icon: Star },
   { id: 'trash', label: 'Trash', icon: Trash }
@@ -51,7 +53,14 @@ export function NotesSidebar(): React.JSX.Element {
     loadTags,
     createFolder,
     moveNote,
-    moveFolder
+    moveFolder,
+    // Threads/Chats
+    threads,
+    currentThreadId,
+    startNewChat,
+    selectThread,
+    deleteThread,
+    updateThread
   } = useAppStore()
 
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
@@ -64,6 +73,11 @@ export function NotesSidebar(): React.JSX.Element {
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [foldersOpen, setFoldersOpen] = useState(true)
   const [tagsOpen, setTagsOpen] = useState(true)
+  const [chatsOpen, setChatsOpen] = useState(true)
+
+  // Chat editing state
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
+  const [editingThreadTitle, setEditingThreadTitle] = useState('')
 
   // Creating new folder state
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
@@ -209,30 +223,6 @@ export function NotesSidebar(): React.JSX.Element {
           className="flex flex-col"
           style={{ paddingTop: 'calc(8px + var(--sidebar-safe-padding, 0px))' }}
         >
-          {/* Smart Views - No header */}
-          <div className="py-1">
-            {SMART_VIEWS.map((view) => {
-              const Icon = view.icon
-              const isSelected = notesFilter.type === 'smart' && notesFilter.value === view.id
-              return (
-                <div
-                  key={view.id}
-                  className={cn(
-                    'flex items-center gap-1.5 py-1 pr-2 cursor-pointer transition-colors text-sm',
-                    isSelected
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'hover:bg-sidebar-accent/50'
-                  )}
-                  style={{ paddingLeft: 12 }}
-                  onClick={() => handleSmartViewClick(view.id)}
-                >
-                  <Icon className="size-4 text-muted-foreground" />
-                  <span>{view.label}</span>
-                </div>
-              )
-            })}
-          </div>
-
           {/* Projects Section */}
           <WideHeader
             title="All Projects"
@@ -241,6 +231,7 @@ export function NotesSidebar(): React.JSX.Element {
             onTitleClick={() => selectProject(null)}
             onAdd={handleNewProject}
             isSelected={currentProjectId === null}
+            borderedSelection
           />
           {projectsOpen && (
             <div className="py-1">
@@ -251,8 +242,8 @@ export function NotesSidebar(): React.JSX.Element {
                       className={cn(
                         'group flex items-center gap-1.5 pr-2 py-1 cursor-pointer transition-colors overflow-hidden text-sm',
                         currentProjectId === project.id
-                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                          : 'hover:bg-sidebar-accent/50',
+                          ? 'ring-1 ring-primary ring-inset text-primary'
+                          : '',
                         dragOverProjectId === project.id && 'ring-2 ring-primary ring-inset bg-primary/10'
                       )}
                       style={{ paddingLeft: 12 }}
@@ -285,7 +276,7 @@ export function NotesSidebar(): React.JSX.Element {
                         <span className="flex-1 truncate">{project.name}</span>
                       )}
                       <button
-                        className="opacity-0 group-hover:opacity-100 shrink-0 p-0.5 hover:bg-sidebar-accent/50 rounded"
+                        className="opacity-0 group-hover:opacity-100 shrink-0 p-0.5 hover:bg-primary/10 rounded"
                         onClick={(e) => {
                           e.stopPropagation()
                           deleteProject(project.id)
@@ -340,6 +331,30 @@ export function NotesSidebar(): React.JSX.Element {
             </div>
           )}
 
+          {/* Smart Views - No header */}
+          <div className="py-1">
+            {SMART_VIEWS.map((view) => {
+              const Icon = view.icon
+              const isSelected = notesFilter.type === 'smart' && notesFilter.value === view.id
+              return (
+                <div
+                  key={view.id}
+                  className={cn(
+                    'flex items-center gap-1.5 py-1 pr-2 cursor-pointer transition-colors text-sm',
+                    isSelected
+                      ? 'bg-primary/15 text-primary'
+                      : ''
+                  )}
+                  style={{ paddingLeft: 12 }}
+                  onClick={() => handleSmartViewClick(view.id)}
+                >
+                  <Icon className="size-4 text-muted-foreground" />
+                  <span>{view.label}</span>
+                </div>
+              )
+            })}
+          </div>
+
           {/* Folders Section */}
           {(() => {
             const currentProject = currentProjectId ? projects.find((p) => p.id === currentProjectId) : null
@@ -381,6 +396,104 @@ export function NotesSidebar(): React.JSX.Element {
           {/* Tags Section */}
           <WideHeader title="Tags" isOpen={tagsOpen} onToggle={() => setTagsOpen(!tagsOpen)} />
           {tagsOpen && <TagsTree />}
+
+          {/* Chats Section */}
+          <WideHeader
+            title={currentProjectId ? 'Chats' : 'All Chats'}
+            isOpen={chatsOpen}
+            onToggle={() => setChatsOpen(!chatsOpen)}
+            onAdd={() => startNewChat()}
+          />
+          {chatsOpen && (
+            <div className="py-1">
+              {threads.map((thread) => (
+                <ContextMenu key={thread.thread_id}>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      className={cn(
+                        'group flex items-center gap-1.5 pr-2 py-1 cursor-pointer transition-colors overflow-hidden text-sm',
+                        currentThreadId === thread.thread_id
+                          ? 'bg-primary/15 text-primary'
+                          : ''
+                      )}
+                      style={{ paddingLeft: 12 }}
+                      onClick={() => {
+                        if (editingThreadId !== thread.thread_id) {
+                          selectThread(thread.thread_id)
+                        }
+                      }}
+                    >
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        {editingThreadId === thread.thread_id ? (
+                          <input
+                            type="text"
+                            value={editingThreadTitle}
+                            onChange={(e) => setEditingThreadTitle(e.target.value)}
+                            onBlur={async () => {
+                              if (editingThreadTitle.trim()) {
+                                await updateThread(thread.thread_id, { title: editingThreadTitle.trim() })
+                              }
+                              setEditingThreadId(null)
+                              setEditingThreadTitle('')
+                            }}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter') {
+                                if (editingThreadTitle.trim()) {
+                                  await updateThread(thread.thread_id, { title: editingThreadTitle.trim() })
+                                }
+                                setEditingThreadId(null)
+                                setEditingThreadTitle('')
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingThreadId(null)
+                                setEditingThreadTitle('')
+                              }
+                            }}
+                            className="w-full bg-background border border-border rounded px-1 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <div className="truncate block">
+                            {thread.title || truncate(thread.thread_id, 20)}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 shrink-0 p-0.5 hover:bg-primary/10 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteThread(thread.thread_id)
+                        }}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => {
+                      setEditingThreadId(thread.thread_id)
+                      setEditingThreadTitle(thread.title || '')
+                    }}>
+                      <Pencil className="size-4 mr-2" />
+                      Rename
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="destructive" onClick={() => deleteThread(thread.thread_id)}>
+                      <Trash2 className="size-4 mr-2" />
+                      Delete
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              ))}
+
+              {threads.length === 0 && (
+                <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                  No chats yet
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </ScrollArea>
     </aside>
@@ -394,6 +507,7 @@ interface WideHeaderProps {
   onTitleClick?: () => void
   onAdd?: () => void
   isSelected?: boolean
+  borderedSelection?: boolean
 }
 
 function WideHeader({
@@ -402,19 +516,22 @@ function WideHeader({
   onToggle,
   onTitleClick,
   onAdd,
-  isSelected
+  isSelected,
+  borderedSelection = false
 }: WideHeaderProps): React.JSX.Element {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-3 py-1 mt-1 border-t border-border/50 transition-colors',
-        isSelected ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/30'
+        'flex items-center justify-between px-3 py-1 mt-1 border-t border-border/50 transition-colors cursor-pointer',
+        isSelected
+          ? borderedSelection
+            ? 'ring-1 ring-primary ring-inset text-primary'
+            : 'bg-primary/15 text-primary'
+          : ''
       )}
+      onClick={onTitleClick || onToggle}
     >
-      <span
-        className="text-sm font-medium text-foreground cursor-pointer"
-        onClick={onTitleClick || onToggle}
-      >
+      <span className="text-sm font-medium text-foreground">
         {title}
       </span>
       <div className="flex items-center gap-1">
@@ -422,16 +539,22 @@ function WideHeader({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={onAdd}
-            className="h-5 w-5 hover:bg-sidebar-accent"
+            onClick={(e) => {
+              e.stopPropagation()
+              onAdd()
+            }}
+            className="h-5 w-5 hover:bg-primary/10"
             title={`New ${title.replace('All ', '')}`}
           >
             <Plus className="size-3.5" />
           </Button>
         )}
         <button
-          className="p-0.5 hover:bg-sidebar-accent/50 rounded cursor-pointer"
-          onClick={onToggle}
+          className="p-0.5 hover:bg-primary/10 rounded cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggle()
+          }}
         >
           {isOpen ? (
             <ChevronDown className="size-4 text-muted-foreground" />

@@ -56,7 +56,7 @@ export function ApprovalDialog({ request }: ApprovalDialogProps) {
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-amber-500/10 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center justify-center size-8 rounded-md bg-amber-500/20 text-amber-500">
+        <div className="flex items-center justify-center size-8 rounded-md bg-primary/20 text-primary">
           <Terminal className="size-4" />
         </div>
         <div className="flex-1 min-w-0">

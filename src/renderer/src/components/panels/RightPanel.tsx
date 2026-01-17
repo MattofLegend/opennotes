@@ -118,17 +118,29 @@ function ResizeHandle({ onDrag }: ResizeHandleProps): React.JSX.Element {
 }
 
 function ModeTabBar(): React.JSX.Element {
-  const { rightPanelMode, setRightPanelMode } = useAppStore()
+  const { rightPanelMode, setRightPanelMode, chatExpanded } = useAppStore()
+
+  // When chat is expanded to main area, only show Inspector header (no toggle needed)
+  if (chatExpanded) {
+    return (
+      <div className="flex items-center h-9 bg-sidebar app-drag-region shrink-0">
+        <div className="flex-1 h-full flex items-center justify-center gap-2 text-xs font-medium bg-background text-foreground">
+          <Search className="size-3.5" />
+          <span>Inspector</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex h-9 border-b border-border bg-sidebar shrink-0 app-drag-region">
+    <div className="flex items-center h-9 bg-sidebar app-drag-region shrink-0">
       <button
         onClick={() => setRightPanelMode('chat')}
         className={cn(
-          'flex-1 flex items-center justify-center gap-2 text-xs font-medium transition-colors',
+          'flex-1 h-full flex items-center justify-center gap-2 text-xs font-medium transition-colors',
           rightPanelMode === 'chat'
-            ? 'bg-background text-foreground border-b-2 border-b-primary'
-            : 'text-muted-foreground hover:text-foreground hover:bg-background-interactive'
+            ? 'bg-background text-foreground'
+            : 'text-muted-foreground hover:text-foreground hover:bg-background-interactive border-b border-border'
         )}
       >
         <MessageSquare className="size-3.5" />
@@ -137,10 +149,10 @@ function ModeTabBar(): React.JSX.Element {
       <button
         onClick={() => setRightPanelMode('inspector')}
         className={cn(
-          'flex-1 flex items-center justify-center gap-2 text-xs font-medium transition-colors',
+          'flex-1 h-full flex items-center justify-center gap-2 text-xs font-medium transition-colors',
           rightPanelMode === 'inspector'
-            ? 'bg-background text-foreground border-b-2 border-b-primary'
-            : 'text-muted-foreground hover:text-foreground hover:bg-background-interactive'
+            ? 'bg-background text-foreground'
+            : 'text-muted-foreground hover:text-foreground hover:bg-background-interactive border-b border-border'
         )}
       >
         <Search className="size-3.5" />
@@ -151,7 +163,7 @@ function ModeTabBar(): React.JSX.Element {
 }
 
 export function RightPanel(): React.JSX.Element {
-  const { todos, workspaceFiles, subagents, rightPanelMode, currentThreadId, isNewChat } = useAppStore()
+  const { todos, workspaceFiles, subagents, rightPanelMode, currentThreadId, isNewChat, chatExpanded } = useAppStore()
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [tasksOpen, setTasksOpen] = useState(true)
@@ -346,7 +358,7 @@ export function RightPanel(): React.JSX.Element {
     >
       <ModeTabBar />
 
-      {rightPanelMode === 'chat' ? (
+      {rightPanelMode === 'chat' && !chatExpanded ? (
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {currentThreadId || isNewChat ? (
             <ChatContainer threadId={currentThreadId || ''} />
@@ -911,9 +923,9 @@ function FileIcon({
 }): React.JSX.Element {
   if (isDir) {
     return isOpen ? (
-      <FolderOpen className="size-3.5 text-amber-500 shrink-0" />
+      <FolderOpen className="size-3.5 text-primary shrink-0" />
     ) : (
-      <Folder className="size-3.5 text-amber-500 shrink-0" />
+      <Folder className="size-3.5 text-primary shrink-0" />
     )
   }
 
@@ -924,33 +936,33 @@ function FileIcon({
   switch (ext) {
     case 'ts':
     case 'tsx':
-      return <FileCode className="size-3.5 text-blue-400 shrink-0" />
+      return <FileCode className="size-3.5 text-primary shrink-0" />
     case 'js':
     case 'jsx':
-      return <FileCode className="size-3.5 text-yellow-400 shrink-0" />
+      return <FileCode className="size-3.5 text-primary shrink-0" />
     case 'json':
-      return <FileJson className="size-3.5 text-yellow-600 shrink-0" />
+      return <FileJson className="size-3.5 text-primary shrink-0" />
     case 'md':
     case 'mdx':
       return <FileText className="size-3.5 text-muted-foreground shrink-0" />
     case 'py':
-      return <FileCode className="size-3.5 text-green-400 shrink-0" />
+      return <FileCode className="size-3.5 text-primary shrink-0" />
     case 'css':
     case 'scss':
     case 'sass':
-      return <FileCode className="size-3.5 text-pink-400 shrink-0" />
+      return <FileCode className="size-3.5 text-primary shrink-0" />
     case 'html':
-      return <FileCode className="size-3.5 text-orange-400 shrink-0" />
+      return <FileCode className="size-3.5 text-primary shrink-0" />
     case 'svg':
     case 'png':
     case 'jpg':
     case 'jpeg':
     case 'gif':
     case 'webp':
-      return <Image className="size-3.5 text-purple-400 shrink-0" />
+      return <Image className="size-3.5 text-primary shrink-0" />
     case 'yml':
     case 'yaml':
-      return <FileType className="size-3.5 text-red-400 shrink-0" />
+      return <FileType className="size-3.5 text-primary shrink-0" />
     default:
       return <File className="size-3.5 text-muted-foreground shrink-0" />
   }

@@ -168,7 +168,7 @@ export interface TagNode {
 }
 
 export type NotesFilterType = 'smart' | 'folder' | 'tag'
-export type SmartViewType = 'all' | 'recent' | 'favorites' | 'trash'
+export type SmartViewType = 'all' | 'untagged' | 'recent' | 'favorites' | 'trash'
 
 export interface NotesFilter {
   type: NotesFilterType

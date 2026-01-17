@@ -21,7 +21,7 @@ const RIGHT_MAX = 700
 const RIGHT_DEFAULT = 400
 
 function App(): React.JSX.Element {
-  const { currentThreadId, loadThreads, createThread, loadProjects } = useAppStore()
+  const { loadThreads, createThread, loadProjects } = useAppStore()
   const [isLoading, setIsLoading] = useState(true)
   const [leftWidth, setLeftWidth] = useState(LEFT_DEFAULT)
   const [notesListWidth, setNotesListWidth] = useState(NOTES_LIST_DEFAULT)
@@ -165,7 +165,7 @@ function App(): React.JSX.Element {
 
         {/* Center - Content Panel (Agent Chat + File Viewer) */}
         <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
-          <TabbedPanel threadId={currentThreadId || ''} showTabBar={false} />
+          <TabbedPanel showTabBar={false} />
         </main>
       </div>
 

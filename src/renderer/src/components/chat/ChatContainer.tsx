@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { Send, Square, Loader2, AlertCircle, X } from 'lucide-react'
+import { Send, Square, Loader2, AlertCircle, X, Maximize2, Minimize2 } from 'lucide-react'
 import { useStream } from '@langchain/langgraph-sdk/react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -84,7 +84,9 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
     setLoadingThreadId,
     setThreadError,
     clearThreadError,
-    ensureThread
+    ensureThread,
+    chatExpanded,
+    setChatExpanded
   } = useAppStore()
 
   // Get error for current thread (or new-chat placeholder)
@@ -483,8 +485,19 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
   return (
     <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
       {/* Chat header with selector */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/50 shrink-0">
-        <ChatSelector />
+      <div className="flex items-center justify-between px-4 h-9 border-b border-border bg-background shrink-0">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-8 w-8"
+            onClick={() => setChatExpanded(!chatExpanded)}
+            title={chatExpanded ? 'Collapse to sidebar' : 'Expand to main area'}
+          >
+            {chatExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          </Button>
+          <ChatSelector />
+        </div>
         <div className="flex items-center gap-2">
           <WorkspacePicker />
         </div>
@@ -502,14 +515,14 @@ export function ChatContainer({ threadId }: ChatContainerProps): React.JSX.Eleme
                 ) : (
                   <div className="text-sm text-center space-y-3">
                     <div>
-                      <span className="text-amber-500">Select a workspace folder</span>
+                      <span className="text-primary">Select a workspace folder</span>
                       <span className="block text-xs mt-1 opacity-75">
                         The agent needs a workspace to create and modify files
                       </span>
                     </div>
                     <button
                       type="button"
-                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2 h-7 text-xs gap-1.5 text-amber-500 hover:bg-accent/50 transition-color duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2 h-7 text-xs gap-1.5 text-primary hover:bg-accent/50 transition-color duration-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={handleSelectWorkspaceFromEmptyState}
                     >
                       <Folder className="size-3.5" />

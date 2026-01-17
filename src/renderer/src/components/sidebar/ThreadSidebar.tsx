@@ -68,8 +68,8 @@ export function ThreadSidebar(): React.JSX.Element {
                   className={cn(
                     'group flex items-center gap-2 rounded-sm px-3 py-2 cursor-pointer transition-colors overflow-hidden',
                     currentThreadId === thread.thread_id
-                      ? 'bg-sidebar-accent text-sidebar-accent-fore ground'
-                      : 'hover:bg-sidebar-accent/50'
+                      ? 'bg-primary/15 text-primary'
+                      : 'hover:bg-primary/10'
                   )}
                   onClick={() => {
                     if (editingThreadId !== thread.thread_id) {

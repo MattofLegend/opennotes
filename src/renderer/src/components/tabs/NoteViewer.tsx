@@ -11,7 +11,7 @@ interface NoteViewerProps {
 }
 
 export function NoteViewer({ relativePath }: NoteViewerProps) {
-  const { updateNote, loadNotes, pendingApproval, respondToApproval, notesPath } = useAppStore()
+  const { updateNote, loadNotes, pendingApproval, respondToApproval, notesPath, openFile, notes } = useAppStore()
   const [content, setContent] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -158,6 +158,69 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [saveNote])
 
+  // Handle link clicks in the editor
+  const handleLinkClick = useCallback((href: string) => {
+    if (!notesPath) return
+
+    // Check if it's an external URL
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      window.open(href, '_blank')
+      return
+    }
+
+    // Decode URL-encoded characters
+    let target = decodeURIComponent(href)
+    
+    // Handle wiki-style links [[Title]] - extract title
+    const wikiMatch = target.match(/\[\[([^\]]+)\]\]/)
+    if (wikiMatch) {
+      target = wikiMatch[1] // Extract just the title part
+    }
+    
+    // Remove .md extension for title matching
+    const titleToMatch = target.replace(/\.md$/, '')
+    
+    // Get current folder for relative path resolution
+    const currentDir = relativePath.includes('/') 
+      ? relativePath.substring(0, relativePath.lastIndexOf('/'))
+      : ''
+
+    // Strategy 1: Match by title (most common for wiki-links)
+    let targetNote = notes.find(n => 
+      n.title.toLowerCase() === titleToMatch.toLowerCase()
+    )
+    
+    // Strategy 2: Match by title within current project/folder first
+    if (!targetNote && currentDir) {
+      targetNote = notes.find(n => 
+        n.folder.startsWith(currentDir.split('/')[0]) && 
+        n.title.toLowerCase() === titleToMatch.toLowerCase()
+      )
+    }
+    
+    // Strategy 3: Exact path match
+    if (!targetNote) {
+      const pathWithExt = target.endsWith('.md') ? target : `${target}.md`
+      targetNote = notes.find(n => n.path === pathWithExt)
+    }
+    
+    // Strategy 4: Relative path from current note
+    if (!targetNote && currentDir) {
+      const relativePath = `${currentDir}/${target.endsWith('.md') ? target : `${target}.md`}`
+      targetNote = notes.find(n => n.path === relativePath)
+    }
+    
+    // Strategy 5: Path ends with target
+    if (!targetNote) {
+      const pathWithExt = target.endsWith('.md') ? target : `${target}.md`
+      targetNote = notes.find(n => n.path.endsWith(pathWithExt))
+    }
+
+    if (targetNote) {
+      openFile(`${notesPath}/${targetNote.path}`, targetNote.title)
+    }
+  }, [notesPath, relativePath, notes, openFile])
+
   const handleBlur = useCallback(() => {
     if (isDirty) {
       if (saveTimeoutRef.current) {
@@ -285,6 +348,7 @@ export function NoteViewer({ relativePath }: NoteViewerProps) {
           content={content}
           onChange={handleChange}
           onBlur={handleBlur}
+          onLinkClick={handleLinkClick}
         />
       </div>
     </div>

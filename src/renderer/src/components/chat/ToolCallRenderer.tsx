@@ -534,7 +534,7 @@ export function ToolCallRenderer({ toolCall, result, isError, needsApproval, onA
           <ChevronRight className="size-4 text-muted-foreground shrink-0" />
         )}
         
-        <Icon className={cn("size-4 shrink-0", needsApproval ? "text-amber-500" : "text-status-info")} />
+        <Icon className={cn("size-4 shrink-0", needsApproval ? "text-primary" : "text-primary")} />
         
         <span className="text-xs font-medium shrink-0">{label}</span>
         

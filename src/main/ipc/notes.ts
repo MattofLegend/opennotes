@@ -308,24 +308,59 @@ export function registerNotesHandlers(ipcMain: IpcMain): void {
 
   // Update a note's content
   ipcMain.handle('notes:update', async (_event, { path: relativePath, content }: { path: string; content: string }) => {
-    const fullPath = join(notesDir, relativePath)
+    let fullPath = join(notesDir, relativePath)
     if (!existsSync(fullPath)) {
       throw new Error('Note not found')
     }
 
+    // Write the content first
     writeFileSync(fullPath, content)
 
-    const stats = statSync(fullPath)
+    // Extract new title and check if filename should change
+    const newTitle = extractTitle(content, basename(relativePath))
+    const currentFilename = basename(relativePath, '.md')
     const folder = dirname(relativePath)
+    
+    // Sanitize title for filename (remove invalid characters)
+    const sanitizedTitle = newTitle
+      .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename chars
+      .replace(/\s+/g, ' ') // Normalize spaces
+      .trim()
+      .slice(0, 100) // Limit length
+    
+    let finalRelativePath = relativePath
+    
+    // Only rename if title is different and sanitized title is valid
+    if (sanitizedTitle && sanitizedTitle !== currentFilename) {
+      const newFilename = `${sanitizedTitle}.md`
+      const newRelativePath = folder === '.' ? newFilename : join(folder, newFilename)
+      const newFullPath = join(notesDir, newRelativePath)
+      
+      // Only rename if target doesn't exist (avoid overwriting)
+      if (!existsSync(newFullPath)) {
+        // Update favorite reference if needed
+        if (isNoteFavorite(relativePath)) {
+          renameNoteFavorite(relativePath, newRelativePath)
+        }
+        
+        // Rename the file
+        renameSync(fullPath, newFullPath)
+        fullPath = newFullPath
+        finalRelativePath = newRelativePath
+      }
+    }
+
+    const stats = statSync(fullPath)
+    const finalFolder = dirname(finalRelativePath)
 
     return {
-      path: relativePath,
-      title: extractTitle(content, basename(relativePath)),
+      path: finalRelativePath,
+      title: newTitle,
       preview: extractPreview(content),
       modifiedAt: stats.mtime.toISOString(),
-      isFavorite: isNoteFavorite(relativePath),
+      isFavorite: isNoteFavorite(finalRelativePath),
       isDeleted: false,
-      folder: folder === '.' ? '' : folder,
+      folder: finalFolder === '.' ? '' : finalFolder,
       tags: parseHashtags(content)
     } as NoteInfo
   })

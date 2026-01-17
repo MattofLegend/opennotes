@@ -31,6 +31,8 @@ function filterNotes(notes: NoteInfo[], filter: { type: string; value: string })
       switch (filter.value) {
         case 'all':
           return sortWithFavoritesFirst(notes.filter((n) => !n.isDeleted))
+        case 'untagged':
+          return sortWithFavoritesFirst(notes.filter((n) => !n.isDeleted && n.tags.length === 0))
         case 'recent':
           return sortWithFavoritesFirst(
             notes.filter((n) => !n.isDeleted && new Date(n.modifiedAt) >= sevenDaysAgo)
@@ -71,6 +73,8 @@ function getFilterDisplayName(filter: { type: string; value: string }): string {
       switch (filter.value) {
         case 'all':
           return 'All Notes'
+        case 'untagged':
+          return 'Untagged'
         case 'recent':
           return 'Recent'
         case 'favorites':
@@ -100,10 +104,26 @@ export function NotesList(): React.JSX.Element {
     restoreNote,
     permanentDeleteNote,
     toggleNoteFavorite,
-    activeTab
+    activeTab,
+    currentProjectId,
+    projects
   } = useAppStore()
 
-  const filteredNotes = useMemo(() => filterNotes(notes, notesFilter), [notes, notesFilter])
+  // Get current project folder for scoping
+  const currentProject = currentProjectId ? projects.find((p) => p.id === currentProjectId) : null
+  const projectFolder = currentProject?.notesFolder || ''
+
+  // Pre-filter notes by project scope, then apply the view filter
+  const filteredNotes = useMemo(() => {
+    let scopedNotes = notes
+    // If a project is selected, scope notes to that project's folder
+    if (projectFolder) {
+      scopedNotes = notes.filter(
+        (n) => n.folder === projectFolder || n.folder.startsWith(projectFolder + '/')
+      )
+    }
+    return filterNotes(scopedNotes, notesFilter)
+  }, [notes, notesFilter, projectFolder])
   const isTrash = notesFilter.type === 'smart' && notesFilter.value === 'trash'
   const filterName = getFilterDisplayName(notesFilter)
 
@@ -263,8 +283,8 @@ function NoteItem({
             className={cn(
               'group px-4 py-3 cursor-pointer transition-colors border-b border-border/50',
               isSelected
-                ? 'bg-primary/10 border-l-2 border-l-primary'
-                : 'hover:bg-background-interactive',
+                ? 'bg-primary/15'
+                : '',
               !isTrash && 'cursor-grab active:cursor-grabbing'
             )}
             onClick={() => onOpen(note)}
